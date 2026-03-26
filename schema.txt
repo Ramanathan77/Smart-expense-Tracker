@@ -1,0 +1,13 @@
+Field	Type	Null	Key	Default	Extra
+id	bigint(20)	NO	PRI	NULL	auto_increment
+userId	int(11)	NO	MUL	NULL	
+name	varchar(255)	NO		NULL	
+category	varchar(255)	NO		NULL	
+amount	decimal(10,2)	NO		NULL	
+date	datetime	YES		NULL	
+createdAt	datetime	NO		NULL	
+updatedAt	datetime	NO		NULL	
+created_at	datetime(6)	YES		NULL	
+updated_at	datetime(6)	YES		NULL	
+user_id	bigint(20)	NO		NULL	
+wallet_type	varchar(255)	YES		Cash	
