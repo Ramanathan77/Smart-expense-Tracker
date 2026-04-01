@@ -106,7 +106,7 @@ export function Account() {
                       style={{ 
                         width: '100%', padding: '12px 16px', borderRadius: '12px',
                         background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
-                        color: 'white', fontSize: '16px', outline: 'none'
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
                       }}
                     />
                   </div>
@@ -119,17 +119,10 @@ export function Account() {
                       style={{ 
                         width: '100%', padding: '12px 16px', borderRadius: '12px',
                         background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
-                        color: 'white', fontSize: '16px', outline: 'none'
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
                       }}
                     />
                   </div>
-                </div>
-
-                <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--glass-border)' }}>
-                  <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Account Security</h3>
-                  <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Shield size={18} /> Change Password
-                  </Button>
                 </div>
               </div>
             )}
@@ -151,7 +144,7 @@ export function Account() {
                       style={{ 
                         flex: 1, padding: '12px 16px', borderRadius: '12px',
                         background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
-                        color: 'white', fontSize: '16px', outline: 'none', maxWidth: '300px'
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none', maxWidth: '300px'
                       }}
                     />
                     <Button variant="primary" onClick={handleSaveBudget}>Save Goal</Button>

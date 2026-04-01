@@ -148,9 +148,9 @@ export function Transactions() {
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
             <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>From:</span>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', colorScheme: 'dark' }} />
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
             <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>To:</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', colorScheme: 'dark' }} />
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
           </div>
           <Button variant="outline" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Download size={16} /> Export CSV
@@ -172,24 +172,24 @@ export function Transactions() {
       {showAdd && (
         <Card highlight style={{ marginBottom: '24px' }}>
           <form onSubmit={handleAdd} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ minWidth: '120px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ minWidth: '120px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
               <option value="expense" style={{background: 'var(--bg-primary)'}}>Expense</option>
               <option value="income" style={{background: 'var(--bg-primary)'}}>Income</option>
             </select>
-            <input type="text" placeholder="Title" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ flex: 1, minWidth: '200px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
-            <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+            <input type="text" placeholder="Title" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ flex: 1, minWidth: '200px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
+            <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
               <option value="Shopping" style={{background: 'var(--bg-primary)'}}>Shopping</option>
               <option value="Food" style={{background: 'var(--bg-primary)'}}>Food</option>
               <option value="Transport" style={{background: 'var(--bg-primary)'}}>Transport</option>
               <option value="Other" style={{background: 'var(--bg-primary)'}}>Other</option>
             </select>
-            <select value={formData.walletType} onChange={e => setFormData({...formData, walletType: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+            <select value={formData.walletType} onChange={e => setFormData({...formData, walletType: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
               <option value="Cash" style={{background: 'var(--bg-primary)'}}>Cash</option>
               <option value="Credit Card" style={{background: 'var(--bg-primary)'}}>Credit Card</option>
               <option value="Bank Account" style={{background: 'var(--bg-primary)'}}>Bank</option>
             </select>
-            <input type="number" step="0.01" min="0" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} style={{ minWidth: '110px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
-            <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'white', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px', colorScheme: 'dark' }} />
+            <input type="number" step="0.01" min="0" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} style={{ minWidth: '110px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
+            <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
             <Button type="submit" variant="primary">Save</Button>
           </form>
         </Card>
@@ -225,7 +225,7 @@ export function Transactions() {
                   </span>
                 </td>
                 <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>{new Date(tx.date).toLocaleDateString()}</td>
-                <td style={{ padding: '16px 24px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px', color: amt > 0 ? '#00ff88' : 'white' }}>
+                <td style={{ padding: '16px 24px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px', color: amt > 0 ? '#10b981' : 'var(--text-primary)' }}>
                   {amt > 0 ? '+' : ''}{amt < 0 ? '-' : ''}{currency}{Math.abs(amt).toFixed(2)}
                 </td>
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>

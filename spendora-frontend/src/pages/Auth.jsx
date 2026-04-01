@@ -41,7 +41,7 @@ export function Auth({ onLogin }) {
     <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', background: 'var(--bg-primary)', flexWrap: 'wrap' }}>
       
       {/* Left Info Section */}
-      <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', padding: '64px', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', borderRight: '1px solid var(--glass-border)' }}>
+      <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', padding: '64px', justifyContent: 'center', background: 'rgba(14, 165, 233, 0.05)', borderRight: '1px solid var(--glass-border)' }}>
         <div className="logo neon-text-cyan" style={{ fontSize: '42px', marginBottom: '24px' }}>
           <Sparkles size={42} /> Spendora
         </div>
@@ -111,7 +111,7 @@ export function Auth({ onLogin }) {
                 style={{ 
                   width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
                   background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-                  color: 'white', fontSize: '16px', outline: 'none'
+                  color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
                 }}
               />
             </div>
@@ -129,7 +129,7 @@ export function Auth({ onLogin }) {
               style={{ 
                 width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
                 background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-                color: 'white', fontSize: '16px', outline: 'none'
+                color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
               }}
             />
           </div>
@@ -146,7 +146,7 @@ export function Auth({ onLogin }) {
               style={{ 
                 width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
                 background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-                color: 'white', fontSize: '16px', outline: 'none'
+                color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
               }}
             />
           </div>

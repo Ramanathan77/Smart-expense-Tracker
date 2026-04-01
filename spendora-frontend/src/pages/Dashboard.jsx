@@ -141,7 +141,7 @@ export function Dashboard() {
                     </Pie>
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
-                      itemStyle={{ color: 'white' }}
+                      itemStyle={{ color: 'var(--text-primary)' }}
                       formatter={(value) => `${currency}${value.toFixed(2)}`}
                     />
                     <Legend />

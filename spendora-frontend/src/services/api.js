@@ -64,6 +64,16 @@ export const getInsights = async () => {
   return res.json();
 };
 
+export const chatWithAi = async (query) => {
+  const res = await fetch(`${API_URL}/insights/chat`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ query })
+  });
+  if (!res.ok) throw new Error('Failed to process AI chat');
+  return res.json();
+};
+
 export const deleteTransaction = async (id) => {
   const res = await fetch(`${API_URL}/transactions/${id}`, {
     method: 'DELETE',

@@ -41,8 +41,14 @@ public class AuthController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtUtil.generateToken(userDetails, savedUser.getId());
 
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", savedUser.getId());
+        userMap.put("name", savedUser.getName());
+        userMap.put("email", savedUser.getEmail());
+
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
+        response.put("user", userMap);
         return ResponseEntity.ok(response);
     }
 
@@ -62,8 +68,15 @@ public class AuthController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
         String token = jwtUtil.generateToken(userDetails, userOpt.get().getId());
 
+        User user = userOpt.get();
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", user.getId());
+        userMap.put("name", user.getName());
+        userMap.put("email", user.getEmail());
+
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
+        response.put("user", userMap);
         return ResponseEntity.ok(response);
     }
 

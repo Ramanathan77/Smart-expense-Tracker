@@ -46,8 +46,8 @@
 
 .nav-links a:hover, .nav-links a.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+  background: rgba(14, 165, 233, 0.1);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.15);
   border-left: 3px solid var(--neon-cyan);
 }
 
@@ -79,7 +79,7 @@
   height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
-  box-shadow: 0 0 15px rgba(138, 43, 226, 0.4);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
 }
 
 .page-wrapper {

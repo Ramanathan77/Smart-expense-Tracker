@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Activity, Sparkles, User } from 'lucide-react';
+import { LayoutDashboard, Wallet, Activity, Sparkles, User, TrendingUp } from 'lucide-react';
 import './App.css';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Insights } from './pages/Insights';
+import { Analysis } from './pages/Analysis';
 import { Auth } from './pages/Auth';
 import { Account } from './pages/Account';
 import { CurrencyProvider, useCurrency } from './context/CurrencyContext';
@@ -28,6 +29,11 @@ function NavLinks() {
       <li>
         <Link to="/insights" className={location.pathname === '/insights' ? 'active' : ''}>
           <Activity size={20} /> AI Insights
+        </Link>
+      </li>
+      <li>
+        <Link to="/analysis" className={location.pathname === '/analysis' ? 'active' : ''}>
+          <TrendingUp size={20} /> Analysis
         </Link>
       </li>
       <li>
@@ -57,7 +63,7 @@ function TopBar({ onLogout }) {
           value={currency} 
           onChange={(e) => setCurrency(e.target.value)}
           style={{ 
-            background: 'var(--glass-bg)', color: 'white', 
+            background: 'var(--glass-bg)', color: 'var(--text-primary)', 
             border: '1px solid var(--glass-border)', padding: '8px 12px', 
             borderRadius: '8px', outline: 'none', cursor: 'pointer' 
           }}
@@ -125,6 +131,7 @@ function App() {
                <Route path="/" element={<Dashboard />} />
                <Route path="/transactions" element={<ErrorBoundary><Transactions /></ErrorBoundary>} />
                <Route path="/insights" element={<Insights />} />
+               <Route path="/analysis" element={<Analysis />} />
                <Route path="/account" element={<Account />} />
              </Routes>
           </div>
