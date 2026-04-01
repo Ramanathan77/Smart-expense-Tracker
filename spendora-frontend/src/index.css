@@ -1,21 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
+  --bg-primary: #0a0f1d;
+  --bg-secondary: #111827;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
   
-  --neon-cyan: #0ea5e9;
-  --neon-magenta: #e11d48;
-  --neon-violet: #8b5cf6;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff003c;
+  --neon-violet: #8a2be2;
   
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-border: rgba(255, 255, 255, 1);
-  --glass-border-highlight: rgba(139, 92, 246, 0.4);
+  --glass-bg: rgba(17, 24, 39, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-highlight: rgba(138, 43, 226, 0.5);
   --glass-blur: blur(24px);
   
-  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
+  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.4);
 }
 
 * {
