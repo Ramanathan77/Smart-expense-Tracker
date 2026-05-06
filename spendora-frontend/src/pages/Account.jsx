@@ -33,9 +33,9 @@ export function Account() {
         <Card highlight style={{ padding: '32px', textAlign: 'center' }}>
           <div style={{
             width: '100px', height: '100px', borderRadius: '50%',
-            background: 'var(--gradient-primary)',
+            background: 'linear-gradient(135deg, var(--neon-violet), var(--neon-cyan))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '36px', fontWeight: 'bold', color: 'white',
+            fontSize: '36px', fontWeight: 'bold', color: '#fff',
             margin: '0 auto 24px',
             boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)'
           }}>

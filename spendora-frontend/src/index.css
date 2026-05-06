@@ -11,11 +11,28 @@
   --neon-violet: #8b5cf6;
   
   --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-border: rgba(255, 255, 255, 1);
-  --glass-border-highlight: rgba(139, 92, 246, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-border-highlight: rgba(139, 92, 246, 0.5);
   --glass-blur: blur(24px);
   
   --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff003c;
+  --neon-violet: #b53cff;
+  
+  --glass-bg: rgba(15, 23, 42, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-highlight: rgba(0, 240, 255, 0.5);
+  
+  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -64,4 +81,19 @@ body {
 
 .p-6 {
   padding: 1.5rem;
+}
+
+/* Sidebar upgrades */
+.sidebar {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.05);
+}
+
+[data-theme='dark'] body {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.1), transparent 55%),
+    radial-gradient(circle at 90% 30%, rgba(0, 240, 255, 0.1), transparent 55%),
+    radial-gradient(circle at 50% 85%, rgba(255, 0, 60, 0.1), transparent 50%);
 }

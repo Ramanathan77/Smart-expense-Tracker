@@ -46,7 +46,7 @@ public class GeminiAiService {
         }
 
         // Validate if API key is not set
-        if (geminiApiKey == null || geminiApiKey.equals("YOUR_ACTUAL_KEY_HERE") || geminiApiKey.trim().isEmpty()) {
+        if (geminiApiKey == null || geminiApiKey.equals("YOUR_ACTUAL_KEY_HERE") || geminiApiKey.equals("${GEMINI_API_KEY}") || geminiApiKey.trim().isEmpty()) {
             return List.of(Map.of(
                 "id", "no-api-key",
                 "type", "alert",
@@ -58,7 +58,7 @@ public class GeminiAiService {
 
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append("Here is a list of my recent financial transactions:\n");
-        for (int i = 0; i < Math.min(transactions.size(), 50); i++) {
+        for (int i = 0; i < Math.min(transactions.size(), 20); i++) {
             Transaction t = transactions.get(i);
             promptBuilder.append("- ").append(t.getName())
                          .append(" (").append(t.getCategory()).append("): ")
@@ -78,7 +78,7 @@ public class GeminiAiService {
             ));
 
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiApiKey))
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
@@ -104,6 +104,22 @@ public class GeminiAiService {
 
                     return objectMapper.readValue(jsonText, new TypeReference<List<Map<String, String>>>() {});
                 }
+            } else if (response.statusCode() == 429) {
+                return List.of(Map.of(
+                    "id", "rate-limit",
+                    "type", "alert",
+                    "color", "var(--neon-pink)",
+                    "title", "API Rate Limit Exceeded",
+                    "description", "We are receiving too many requests. Please wait a minute before generating more insights."
+                ));
+            } else if (response.statusCode() == 503) {
+                return List.of(Map.of(
+                    "id", "service-unavailable",
+                    "type", "alert",
+                    "color", "var(--neon-pink)",
+                    "title", "AI Service Overloaded",
+                    "description", "Google's AI service is temporarily overloaded. Please try again in a few moments."
+                ));
             } else {
                 System.err.println("Gemini API Error: " + response.body());
                 return List.of(Map.of(
@@ -130,20 +146,24 @@ public class GeminiAiService {
     }
 
     public String chatWithAssistant(Long userId, String userQuery) {
+        if (geminiApiKey == null || geminiApiKey.equals("YOUR_ACTUAL_KEY_HERE") || geminiApiKey.equals("${GEMINI_API_KEY}") || geminiApiKey.trim().isEmpty()) {
+            return "Please add your real Gemini API key to .env so I can process your request!";
+        }
+
         List<Transaction> transactions = transactionRepository.findByUserIdOrderByDateDesc(userId);
         
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append("You are a smart, professional, and friendly financial assistant named Spendora AI.\n");
-        promptBuilder.append("The user is asking you a direct question about their finances: \"").append(userQuery).append("\"\n\n");
-        promptBuilder.append("Here is their recent transaction history to use as context (if relevant):\n");
+        promptBuilder.append("The user is saying: \"").append(userQuery).append("\"\n\n");
+        promptBuilder.append("Here is their recent transaction history to use as context (only reference if their message is about finances/spending):\n");
         
-        for (int i = 0; i < Math.min(transactions.size(), 30); i++) {
+        for (int i = 0; i < Math.min(transactions.size(), 10); i++) {
             Transaction t = transactions.get(i);
             promptBuilder.append("- ").append(t.getName())
                          .append(" (").append(t.getCategory()).append("): ")
                          .append(t.getAmount()).append("\n");
         }
-        promptBuilder.append("\nPlease answer the user's question directly, clearly, and concisely. Use markdown formatting to make your response easy to read.");
+        promptBuilder.append("\nPlease answer the user's question directly, clearly, and concisely. If they just say 'hi', just greet them back nicely. Use markdown formatting to make your response easy to read.");
 
         try {
             String requestBody = objectMapper.writeValueAsString(Map.of(
@@ -153,7 +173,7 @@ public class GeminiAiService {
             ));
 
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiApiKey))
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
@@ -167,6 +187,10 @@ public class GeminiAiService {
                     JsonNode textNode = candidates.get(0).path("content").path("parts").get(0).path("text");
                     return textNode.asText().trim();
                 }
+            } else if (response.statusCode() == 429) {
+                return "I'm receiving too many requests right now! Google's free API limits to 15 requests/minute. Please give me a minute to catch my breath before asking another question.";
+            } else if (response.statusCode() == 503) {
+                return "Google's AI service is temporarily overloaded (Error 503). Please just wait a few seconds and send your message again!";
             } else {
                 System.err.println("Gemini Chat API Error: " + response.body());
                 return "Error connecting to AI: " + response.statusCode();

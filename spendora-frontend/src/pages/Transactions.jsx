@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { DollarSign, ShoppingBag, Coffee, Car, Upload, Download, Trash2 } from 'lucide-react';
+import { DollarSign, ShoppingBag, Coffee, Car, Upload, Download, Trash2, Sparkles } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
-import { getTransactions, addTransaction, addBulkTransactions, deleteTransaction } from '../services/api';
+import { getTransactions, addTransaction, addBulkTransactions, deleteTransaction, editTransaction, chatWithAi } from '../services/api';
 
 const icons = {
   Shopping: <ShoppingBag size={20} className="neon-text-cyan" />,
@@ -18,8 +18,12 @@ export function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [formData, setFormData] = useState({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [aiAdvice, setAiAdvice] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const loadTxs = async () => {
     try {
@@ -43,25 +47,47 @@ export function Transactions() {
     loadTxs();
   }, []);
 
-  const handleAdd = async (e) => {
+  const handleAddOrEdit = async (e) => {
     e.preventDefault();
     try {
       let finalAmount = Math.abs(parseFloat(formData.amount));
       if (formData.type === 'expense') finalAmount = -finalAmount;
 
-      await addTransaction({
+      const payload = {
         name: formData.name,
         category: formData.category,
         amount: finalAmount,
         walletType: formData.walletType,
         date: formData.date ? new Date(formData.date).toISOString() : new Date().toISOString()
-      });
+      };
+
+      if (editingId) {
+        await editTransaction(editingId, payload);
+      } else {
+        await addTransaction(payload);
+      }
+      
       setShowAdd(false);
+      setEditingId(null);
       setFormData({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
       loadTxs();
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleEditClick = (tx) => {
+    setEditingId(tx.id || tx._id);
+    const amt = parseFloat(tx.amount);
+    setFormData({
+      type: amt >= 0 ? 'income' : 'expense',
+      name: tx.name,
+      category: tx.category,
+      amount: Math.abs(amt).toString(),
+      walletType: tx.walletType || 'Cash',
+      date: new Date(tx.date).toISOString().split('T')[0]
+    });
+    setShowAdd(true);
   };
 
   const handleFileUpload = (e) => {
@@ -138,40 +164,79 @@ export function Transactions() {
        end.setHours(23, 59, 59, 999);
        if (txDate.getTime() > end.getTime()) return false;
     }
-    return true;
+    return tx.category.toLowerCase().includes(searchQuery.toLowerCase());
   });
+
+  const handleGetAiAdvice = async () => {
+    if (filteredTransactions.length === 0) return;
+    setIsAiLoading(true);
+    setAiAdvice('');
+    
+    try {
+      const summary = filteredTransactions.slice(0, 30).map(t => `${t.name} (${t.category}): ${t.amount}`).join(', ');
+      const query = `Please review these specific transactions and give me 2 concise, highly actionable financial tips or observations about my spending patterns: ${summary}`;
+      const response = await chatWithAi(query);
+      setAiAdvice(response.message);
+    } catch (err) {
+      setAiAdvice('Failed to get AI advice: ' + err.message);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   return (
     <div className="transactions-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <h1 style={{ margin: 0 }}>Transactions</h1>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-            <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>From:</span>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
-            <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>To:</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
+        
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', outline: 'none' }} 
+            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>From:</span>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
+              <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>To:</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
+            </div>
           </div>
-          <Button variant="outline" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Download size={16} /> Export CSV
-          </Button>
-          <input 
-            type="file" 
-            accept=".csv" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            style={{ display: 'none' }} 
-          />
-          <Button variant="secondary" onClick={() => fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Upload size={16} /> Upload CSV
-          </Button>
-          <Button onClick={() => setShowAdd(!showAdd)}>{showAdd ? 'Cancel' : '+ Add Receipt'}</Button>
+          
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Button variant="outline" onClick={handleGetAiAdvice} disabled={isAiLoading || filteredTransactions.length === 0} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-cyan)', borderColor: 'var(--neon-cyan)' }}>
+              <Sparkles size={16} /> {isAiLoading ? 'Analyzing...' : 'AI Review'}
+            </Button>
+            <Button variant="outline" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Download size={16} /> Export CSV
+            </Button>
+            <input 
+              type="file" 
+              accept=".csv" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              style={{ display: 'none' }} 
+            />
+            <Button variant="secondary" onClick={() => fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Upload size={16} /> Upload CSV
+            </Button>
+            <Button onClick={() => {
+              if (showAdd && editingId) {
+                setEditingId(null);
+                setFormData({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
+              }
+              setShowAdd(!showAdd);
+            }}>{showAdd ? 'Cancel' : '+ Add Transaction'}</Button>
+          </div>
         </div>
       </div>
 
       {showAdd && (
         <Card highlight style={{ marginBottom: '24px' }}>
-          <form onSubmit={handleAdd} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <form onSubmit={handleAddOrEdit} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ minWidth: '120px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
               <option value="expense" style={{background: 'var(--bg-primary)'}}>Expense</option>
               <option value="income" style={{background: 'var(--bg-primary)'}}>Income</option>
@@ -192,6 +257,22 @@ export function Transactions() {
             <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
             <Button type="submit" variant="primary">Save</Button>
           </form>
+        </Card>
+      )}
+
+      {(aiAdvice || isAiLoading) && (
+        <Card highlight style={{ marginBottom: '24px', background: 'rgba(0, 240, 255, 0.05)', border: '1px solid var(--neon-cyan)' }}>
+           <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-cyan)' }}>
+             <Sparkles size={20} /> AI Financial Advice
+           </h3>
+           <div style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+             {isAiLoading ? 'Analyzing your filtered transactions...' : aiAdvice.split('\n').map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i !== aiAdvice.split('\n').length - 1 && <br />}
+                </span>
+             ))}
+           </div>
         </Card>
       )}
 
@@ -229,9 +310,14 @@ export function Transactions() {
                   {amt > 0 ? '+' : ''}{amt < 0 ? '-' : ''}{currency}{Math.abs(amt).toFixed(2)}
                 </td>
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                  <Button variant="outline" onClick={() => handleDelete(tx.id || tx._id)} style={{ padding: '8px', borderColor: 'rgba(255,0,60,0.3)', color: 'var(--neon-magenta)', display: 'flex', justifyContent: 'center' }}>
-                    <Trash2 size={16} />
-                  </Button>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <Button variant="outline" onClick={() => handleEditClick(tx)} style={{ padding: '8px', color: 'var(--neon-cyan)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                      Edit
+                    </Button>
+                    <Button variant="outline" onClick={() => handleDelete(tx.id || tx._id)} style={{ padding: '8px', borderColor: 'rgba(255,0,60,0.3)', color: 'var(--neon-magenta)', display: 'flex', justifyContent: 'center' }}>
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
                 </td>
               </tr>
               );

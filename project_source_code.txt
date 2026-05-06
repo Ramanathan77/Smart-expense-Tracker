@@ -1,0 +1,2978 @@
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\components\DatabaseSeeder.java
+
+================================================================================
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.Transaction;
+import com.example.demo.entity.User;
+import com.example.demo.repository.TransactionRepository;
+import com.example.demo.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Component
+public class DatabaseSeeder implements CommandLineRunner {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        User bob = userRepository.findByEmail("bob@gmail.com").orElseGet(() -> {
+            User newBob = new User();
+            newBob.setName("Bob");
+            newBob.setEmail("bob@gmail.com");
+            newBob.setPassword(passwordEncoder.encode("password123"));
+            return userRepository.save(newBob);
+        });
+
+        if (transactionRepository.findByUserIdOrderByDateDesc(bob.getId()).isEmpty()) {
+            Transaction t1 = new Transaction(); t1.setUserId(bob.getId()); t1.setName("Monthly Salary"); t1.setCategory("Other"); t1.setAmount(new BigDecimal("5000.00")); t1.setWalletType("Bank Account"); t1.setDate(LocalDateTime.now().minusDays(15));
+            Transaction t2 = new Transaction(); t2.setUserId(bob.getId()); t2.setName("Groceries"); t2.setCategory("Food"); t2.setAmount(new BigDecimal("-150.00")); t2.setWalletType("Credit Card"); t2.setDate(LocalDateTime.now().minusDays(5));
+            Transaction t3 = new Transaction(); t3.setUserId(bob.getId()); t3.setName("Netflix"); t3.setCategory("Shopping"); t3.setAmount(new BigDecimal("-15.99")); t3.setWalletType("Credit Card"); t3.setDate(LocalDateTime.now().minusDays(2));
+            Transaction t4 = new Transaction(); t4.setUserId(bob.getId()); t4.setName("Uber"); t4.setCategory("Transport"); t4.setAmount(new BigDecimal("-25.50")); t4.setWalletType("Cash"); t4.setDate(LocalDateTime.now().minusDays(1));
+            Transaction t5 = new Transaction(); t5.setUserId(bob.getId()); t5.setName("Gym Membership"); t5.setCategory("Other"); t5.setAmount(new BigDecimal("-40.00")); t5.setWalletType("Bank Account"); t5.setDate(LocalDateTime.now());
+            
+            transactionRepository.saveAll(List.of(t1, t2, t3, t4, t5));
+            System.out.println("Seeded Bob's account with beautifully structured demo transactions!");
+        }
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\controller\AuthController.java
+
+================================================================================
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.User;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+    @Autowired
+    private AuthenticationManager authenticationManager;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private JwtUtil jwtUtil;
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of("msg", "User already exists"));
+        }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        User savedUser = userRepository.save(user);
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String token = jwtUtil.generateToken(userDetails, savedUser.getId());
+
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", savedUser.getId());
+        userMap.put("name", savedUser.getName());
+        userMap.put("email", savedUser.getEmail());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token);
+        response.put("user", userMap);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> loginUser(@RequestBody Map<String, String> creds) {
+        String email = creds.get("email");
+        String password = creds.get("password");
+        try {
+            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("msg", "Invalid Credentials"));
+        }
+        
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if(userOpt.isEmpty()) return ResponseEntity.status(401).body(Map.of("msg", "Invalid Credentials"));
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+        String token = jwtUtil.generateToken(userDetails, userOpt.get().getId());
+
+        User user = userOpt.get();
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", user.getId());
+        userMap.put("name", user.getName());
+        userMap.put("email", user.getEmail());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token);
+        response.put("user", userMap);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getUserProfile(@RequestHeader("Authorization") String token) {
+        String jwt = token.substring(7);
+        String email = jwtUtil.extractUsername(jwt);
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if(userOpt.isPresent()){
+            User u = userOpt.get();
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", u.getId());
+            map.put("name", u.getName());
+            map.put("email", u.getEmail());
+            map.put("date", u.getCreatedAt());
+            return ResponseEntity.ok(map);
+        }
+        return ResponseEntity.status(404).body(Map.of("msg", "User not found"));
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\controller\InsightController.java
+
+================================================================================
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.User;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.security.JwtUtil;
+import com.example.demo.service.GeminiAiService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/insights")
+public class InsightController {
+
+    @Autowired
+    private GeminiAiService geminiAiService;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private Long getUserIdFromToken(String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        User user = userRepository.findByEmail(email).orElseThrow();
+        return user.getId();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Map<String, String>>> getInsights(@RequestHeader("Authorization") String authHeader) {
+        Long userId = getUserIdFromToken(authHeader);
+        List<Map<String, String>> insights = geminiAiService.generateInsightsForUser(userId);
+        return ResponseEntity.ok(insights);
+    }
+
+    @PostMapping("/chat")
+    public ResponseEntity<Map<String, String>> chat(@RequestHeader("Authorization") String authHeader, @RequestBody Map<String, String> payload) {
+        Long userId = getUserIdFromToken(authHeader);
+        String query = payload.get("query");
+        String response = geminiAiService.chatWithAssistant(userId, query);
+        return ResponseEntity.ok(Map.of("message", response));
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\controller\TransactionController.java
+
+================================================================================
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.Transaction;
+import com.example.demo.entity.User;
+import com.example.demo.repository.TransactionRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/transactions")
+public class TransactionController {
+
+    @Autowired
+    private TransactionRepository transactionRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private Long getUserIdFromToken(String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractUsername(token);
+        User user = userRepository.findByEmail(email).orElseThrow();
+        return user.getId();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Transaction>> getUserTransactions(@RequestHeader("Authorization") String authHeader) {
+        Long userId = getUserIdFromToken(authHeader);
+        return ResponseEntity.ok(transactionRepository.findByUserIdOrderByDateDesc(userId));
+    }
+
+    @PostMapping
+    public ResponseEntity<Transaction> addTransaction(@RequestHeader("Authorization") String authHeader, @RequestBody Transaction tx) {
+        Long userId = getUserIdFromToken(authHeader);
+        tx.setUserId(userId);
+        if(tx.getWalletType() == null || tx.getWalletType().isEmpty()) tx.setWalletType("Cash");
+        if(tx.getDate() == null) tx.setDate(java.time.LocalDateTime.now());
+        return ResponseEntity.ok(transactionRepository.save(tx));
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<List<Transaction>> addBulkTransactions(@RequestHeader("Authorization") String authHeader, @RequestBody Map<String, List<Transaction>> payload) {
+        Long userId = getUserIdFromToken(authHeader);
+        List<Transaction> transactions = payload.get("transactions");
+        for (Transaction tx : transactions) {
+            tx.setUserId(userId);
+            if(tx.getWalletType() == null || tx.getWalletType().isEmpty()) tx.setWalletType("Cash");
+            if(tx.getDate() == null) tx.setDate(java.time.LocalDateTime.now());
+        }
+        return ResponseEntity.ok(transactionRepository.saveAll(transactions));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTransaction(@RequestHeader("Authorization") String authHeader, @PathVariable Long id) {
+        Long userId = getUserIdFromToken(authHeader);
+        Transaction tx = transactionRepository.findById(id).orElse(null);
+        if (tx == null) return ResponseEntity.status(404).body(Map.of("msg", "Not found"));
+        if (!tx.getUserId().equals(userId)) return ResponseEntity.status(401).body(Map.of("msg", "Not authorized"));
+        
+        transactionRepository.delete(tx);
+        return ResponseEntity.ok(Map.of("msg", "Deleted"));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> editTransaction(@RequestHeader("Authorization") String authHeader, @PathVariable Long id, @RequestBody Transaction newTxData) {
+        Long userId = getUserIdFromToken(authHeader);
+        Transaction tx = transactionRepository.findById(id).orElse(null);
+        if (tx == null) return ResponseEntity.status(404).body(Map.of("msg", "Not found"));
+        if (!tx.getUserId().equals(userId)) return ResponseEntity.status(401).body(Map.of("msg", "Not authorized"));
+        
+        tx.setName(newTxData.getName());
+        tx.setCategory(newTxData.getCategory());
+        tx.setAmount(newTxData.getAmount());
+        if(newTxData.getWalletType() != null && !newTxData.getWalletType().isEmpty()) tx.setWalletType(newTxData.getWalletType());
+        if(newTxData.getDate() != null) tx.setDate(newTxData.getDate());
+        
+        return ResponseEntity.ok(transactionRepository.save(tx));
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\entity\Transaction.java
+
+================================================================================
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "Transactions")
+@Data
+public class Transaction {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "userId", nullable = false)
+    private Long userId;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private String category;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;
+
+    @Column(name = "walletType", columnDefinition = "varchar(255) default 'Cash'")
+    private String walletType = "Cash";
+
+    @Column(nullable = false)
+    private LocalDateTime date = LocalDateTime.now();
+
+    @Column(name = "createdAt", updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updatedAt")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\entity\User.java
+
+================================================================================
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "Users")
+@Data
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(name = "createdAt", updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updatedAt")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\repository\TransactionRepository.java
+
+================================================================================
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.Transaction;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+    List<Transaction> findByUserIdOrderByDateDesc(Long userId);
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\repository\UserRepository.java
+
+================================================================================
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\security\CustomUserDetailsService.java
+
+================================================================================
+
+package com.example.demo.security;
+
+import com.example.demo.entity.User;
+import com.example.demo.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.ArrayList;
+
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), new ArrayList<>());
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\security\JwtFilter.java
+
+================================================================================
+
+package com.example.demo.security;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+public class JwtFilter extends OncePerRequestFilter {
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        
+        final String authorizationHeader = request.getHeader("Authorization");
+
+        String username = null;
+        String jwt = null;
+
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            jwt = authorizationHeader.substring(7);
+            try {
+                username = jwtUtil.extractUsername(jwt);
+            } catch(Exception e) {
+                System.out.println("JWT Parse Error: " + e.getMessage());
+            }
+        }
+
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+            if (jwtUtil.validateToken(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+        chain.doFilter(request, response);
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\security\JwtUtil.java
+
+================================================================================
+
+package com.example.demo.security;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+@Component
+public class JwtUtil {
+
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Value("${jwt.expiration}")
+    private Long jwtExpirationInMs;
+
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token).getBody();
+    }
+
+    private Boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    public String generateToken(UserDetails userDetails, Long userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    private String createToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512).compact();
+    }
+
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes());
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\security\SecurityConfig.java
+
+================================================================================
+
+package com.example.demo.security;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+import java.util.Arrays;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Autowired
+    private JwtFilter jwtFilter;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.cors().and().csrf().disable()
+            .authorizeHttpRequests()
+            .requestMatchers("/api/auth/**").permitAll()
+            .anyRequest().authenticated()
+            .and()
+            .sessionManagement()
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsFilter corsFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
+        config.setAllowedHeaders(Arrays.asList("Origin", "Content-Type", "Accept", "Authorization"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\service\GeminiAiService.java
+
+================================================================================
+
+package com.example.demo.service;
+
+import com.example.demo.entity.Transaction;
+import com.example.demo.repository.TransactionRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class GeminiAiService {
+
+    @Value("${gemini.api.key}")
+    private String geminiApiKey;
+
+    private final TransactionRepository transactionRepository;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
+
+    public GeminiAiService(TransactionRepository transactionRepository, ObjectMapper objectMapper) {
+        this.transactionRepository = transactionRepository;
+        this.objectMapper = objectMapper;
+        this.httpClient = HttpClient.newHttpClient();
+    }
+
+    public List<Map<String, String>> generateInsightsForUser(Long userId) {
+        List<Transaction> transactions = transactionRepository.findByUserIdOrderByDateDesc(userId);
+        
+        if (transactions.isEmpty()) {
+            return List.of(Map.of(
+                "id", "no-data",
+                "type", "insight",
+                "color", "var(--neon-cyan)",
+                "title", "Not Enough Data",
+                "description", "Add some transactions to get AI-powered financial insights!"
+            ));
+        }
+
+        // Validate if API key is not set
+        if (geminiApiKey == null || geminiApiKey.equals("YOUR_ACTUAL_KEY_HERE") || geminiApiKey.equals("${GEMINI_API_KEY}") || geminiApiKey.trim().isEmpty()) {
+            return List.of(Map.of(
+                "id", "no-api-key",
+                "type", "alert",
+                "color", "var(--neon-pink)",
+                "title", "Gemini API Key Missing",
+                "description", "Please add your real Gemini API key to application.properties to enable AI insights."
+            ));
+        }
+
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("Here is a list of my recent financial transactions:\n");
+        for (int i = 0; i < Math.min(transactions.size(), 20); i++) {
+            Transaction t = transactions.get(i);
+            promptBuilder.append("- ").append(t.getName())
+                         .append(" (").append(t.getCategory()).append("): ")
+                         .append(t.getAmount()).append("\n");
+        }
+        promptBuilder.append("\nPlease thoroughly analyze these transactions and provide exactly 3 highly actionable pieces of financial advice or alerts. ");
+        promptBuilder.append("Return ONLY a valid JSON array of objects. ");
+        promptBuilder.append("Each object must have the following string keys: 'id' (a unique string), 'type' (choose one of: 'subscription', 'dining', 'alert', 'insight'), ");
+        promptBuilder.append("'color' (choose one of: 'var(--neon-violet)', 'var(--neon-magenta)', 'var(--neon-cyan)', '#10b981'), 'title' (a short compelling title), and 'description' (the detailed practical advice).");
+
+        try {
+            // Build the JSON request body for Gemini
+            String requestBody = objectMapper.writeValueAsString(Map.of(
+                "contents", List.of(Map.of(
+                    "parts", List.of(Map.of("text", promptBuilder.toString()))
+                ))
+            ));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                // Parse the Gemini Response
+                JsonNode rootNode = objectMapper.readTree(response.body());
+                JsonNode candidates = rootNode.path("candidates");
+                if (candidates.isArray() && candidates.size() > 0) {
+                    JsonNode textNode = candidates.get(0).path("content").path("parts").get(0).path("text");
+                    String jsonText = textNode.asText().trim();
+                    
+                    // Robustly extract JSON array part from Markdown if present
+                    int startIdx = jsonText.indexOf('[');
+                    int endIdx = jsonText.lastIndexOf(']');
+                    if (startIdx >= 0 && endIdx >= startIdx) {
+                        jsonText = jsonText.substring(startIdx, endIdx + 1);
+                    } else {
+                        throw new RuntimeException("Could not find a valid JSON array in Gemini response.");
+                    }
+
+                    return objectMapper.readValue(jsonText, new TypeReference<List<Map<String, String>>>() {});
+                }
+            } else if (response.statusCode() == 429) {
+                return List.of(Map.of(
+                    "id", "rate-limit",
+                    "type", "alert",
+                    "color", "var(--neon-pink)",
+                    "title", "API Rate Limit Exceeded",
+                    "description", "We are receiving too many requests. Please wait a minute before generating more insights."
+                ));
+            } else if (response.statusCode() == 503) {
+                return List.of(Map.of(
+                    "id", "service-unavailable",
+                    "type", "alert",
+                    "color", "var(--neon-pink)",
+                    "title", "AI Service Overloaded",
+                    "description", "Google's AI service is temporarily overloaded. Please try again in a few moments."
+                ));
+            } else {
+                System.err.println("Gemini API Error: " + response.body());
+                return List.of(Map.of(
+                    "id", "api-error",
+                    "type", "alert",
+                    "color", "var(--neon-pink)",
+                    "title", "AI Processing Error",
+                    "description", "We couldn't connect to the AI model. Status Code: " + response.statusCode()
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return List.of(Map.of(
+                "id", "system-error",
+                "type", "alert",
+                "color", "var(--neon-pink)",
+                "title", "System Error",
+                "description", "An error occurred while generating insights: " + e.getMessage()
+            ));
+        }
+
+        return new ArrayList<>();
+    }
+
+    public String chatWithAssistant(Long userId, String userQuery) {
+        if (geminiApiKey == null || geminiApiKey.equals("YOUR_ACTUAL_KEY_HERE") || geminiApiKey.equals("${GEMINI_API_KEY}") || geminiApiKey.trim().isEmpty()) {
+            return "Please add your real Gemini API key to .env so I can process your request!";
+        }
+
+        List<Transaction> transactions = transactionRepository.findByUserIdOrderByDateDesc(userId);
+        
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("You are a smart, professional, and friendly financial assistant named Spendora AI.\n");
+        promptBuilder.append("The user is saying: \"").append(userQuery).append("\"\n\n");
+        promptBuilder.append("Here is their recent transaction history to use as context (only reference if their message is about finances/spending):\n");
+        
+        for (int i = 0; i < Math.min(transactions.size(), 10); i++) {
+            Transaction t = transactions.get(i);
+            promptBuilder.append("- ").append(t.getName())
+                         .append(" (").append(t.getCategory()).append("): ")
+                         .append(t.getAmount()).append("\n");
+        }
+        promptBuilder.append("\nPlease answer the user's question directly, clearly, and concisely. If they just say 'hi', just greet them back nicely. Use markdown formatting to make your response easy to read.");
+
+        try {
+            String requestBody = objectMapper.writeValueAsString(Map.of(
+                "contents", List.of(Map.of(
+                    "parts", List.of(Map.of("text", promptBuilder.toString()))
+                ))
+            ));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                JsonNode rootNode = objectMapper.readTree(response.body());
+                JsonNode candidates = rootNode.path("candidates");
+                if (candidates.isArray() && candidates.size() > 0) {
+                    JsonNode textNode = candidates.get(0).path("content").path("parts").get(0).path("text");
+                    return textNode.asText().trim();
+                }
+            } else if (response.statusCode() == 429) {
+                return "I'm receiving too many requests right now! Google's free API limits to 15 requests/minute. Please give me a minute to catch my breath before asking another question.";
+            } else if (response.statusCode() == 503) {
+                return "Google's AI service is temporarily overloaded (Error 503). Please just wait a few seconds and send your message again!";
+            } else {
+                System.err.println("Gemini Chat API Error: " + response.body());
+                return "Error connecting to AI: " + response.statusCode();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "A system error occurred while generating a response: " + e.getMessage();
+        }
+
+        return "I'm sorry, I couldn't process your request right now.";
+    }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\src\main\java\com\example\demo\DemoApplication.java
+
+================================================================================
+
+package com.example.demo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(DemoApplication.class, args);
+	}
+
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\components\Button.css
+
+================================================================================
+
+.spendora-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  color: white;
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(0, 240, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 10px rgba(255, 0, 60, 0.2);
+  transform: translateY(-2px);
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\components\Button.jsx
+
+================================================================================
+
+import React from 'react';
+import './Button.css';
+
+export function Button({ children, variant = 'primary', className = '', ...props }) {
+  return (
+    <button className={`spendora-btn btn-${variant} ${className}`} {...props}>
+      {children}
+    </button>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\components\Card.jsx
+
+================================================================================
+
+import React from 'react';
+
+export function Card({ children, className = '', highlight = false, style = {} }) {
+  return (
+    <div 
+      className={`glass-panel p-6 ${className}`} 
+      style={{
+        ...style,
+        ...(highlight ? { border: '1px solid var(--neon-cyan)', boxShadow: '0 0 15px rgba(0, 240, 255, 0.2)' } : {})
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\components\ErrorBoundary.jsx
+
+================================================================================
+
+import React from 'react';
+
+export class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', color: '#ffaaa5', background: '#2d0010', height: '100vh', boxSizing: 'border-box' }}>
+          <h1>Component Crashed</h1>
+          <details style={{ whiteSpace: 'pre-wrap', marginTop: '20px', fontSize: '14px', lineHeight: '1.5' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>{this.state.error && this.state.error.toString()}</summary>
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+        </div>
+      );
+    }
+    return this.props.children; 
+  }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\context\CurrencyContext.jsx
+
+================================================================================
+
+import React, { createContext, useContext, useState } from 'react';
+
+const CurrencyContext = createContext();
+
+export const useCurrency = () => useContext(CurrencyContext);
+
+export const CurrencyProvider = ({ children }) => {
+  const [currency, setCurrency] = useState('$');
+
+  return (
+    <CurrencyContext.Provider value={{ currency, setCurrency }}>
+      {children}
+    </CurrencyContext.Provider>
+  );
+};
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Account.jsx
+
+================================================================================
+
+import React, { useState } from 'react';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { User, Mail, Calendar, Settings, Bell, Shield, LogOut } from 'lucide-react';
+
+export function Account() {
+  const [activeTab, setActiveTab] = useState('profile');
+  const [budget, setBudget] = useState(localStorage.getItem('spendora_budget') || '');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  const handleSaveBudget = () => {
+    localStorage.setItem('spendora_budget', budget);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+  
+  let user = { name: 'Guest User', email: 'guest@spendora.com', id: 'N/A' };
+  try {
+    const rawUser = localStorage.getItem('spendora_user');
+    if (rawUser && rawUser !== 'undefined') user = JSON.parse(rawUser);
+  } catch (e) {
+    console.error('Failed to parse user', e);
+  }
+
+  // Generate a mock join date based on the user ID for realism (or use current date if none)
+  const joinDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  return (
+    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+      
+      {/* Sidebar / Profile Summary */}
+      <div style={{ flex: '1 1 300px' }}>
+        <Card highlight style={{ padding: '32px', textAlign: 'center' }}>
+          <div style={{
+            width: '100px', height: '100px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--neon-violet), var(--neon-cyan))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '36px', fontWeight: 'bold', color: '#fff',
+            margin: '0 auto 24px',
+            boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)'
+          }}>
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          
+          <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>{user.name}</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>{user.email}</p>
+          
+          <div style={{ background: 'var(--glass-bg)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <Calendar size={18} style={{ color: 'var(--neon-cyan)' }} />
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Joined {joinDate}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Shield size={18} style={{ color: 'var(--neon-magenta)' }} />
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Pro Member</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Main Account Settings */}
+      <div style={{ flex: '2 1 500px' }}>
+        <Card style={{ padding: '0', overflow: 'hidden' }}>
+          
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
+            <button 
+              onClick={() => setActiveTab('profile')}
+              style={{
+                flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                color: activeTab === 'profile' ? 'var(--neon-cyan)' : 'var(--text-secondary)',
+                borderBottom: activeTab === 'profile' ? '2px solid var(--neon-cyan)' : '2px solid transparent',
+                cursor: 'pointer', fontSize: '16px', fontWeight: '500', transition: 'all 0.3s'
+              }}
+            >
+              <User size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Profile details
+            </button>
+            <button 
+              onClick={() => setActiveTab('preferences')}
+              style={{
+                flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                color: activeTab === 'preferences' ? 'var(--neon-magenta)' : 'var(--text-secondary)',
+                borderBottom: activeTab === 'preferences' ? '2px solid var(--neon-magenta)' : '2px solid transparent',
+                cursor: 'pointer', fontSize: '16px', fontWeight: '500', transition: 'all 0.3s'
+              }}
+            >
+              <Settings size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Preferences
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div style={{ padding: '32px' }}>
+            {activeTab === 'profile' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Personal Information</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '14px' }}>Full Name</label>
+                    <input 
+                      type="text" 
+                      value={user.name} 
+                      readOnly
+                      style={{ 
+                        width: '100%', padding: '12px 16px', borderRadius: '12px',
+                        background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '14px' }}>Email Address</label>
+                    <input 
+                      type="email" 
+                      value={user.email} 
+                      readOnly
+                      style={{ 
+                        width: '100%', padding: '12px 16px', borderRadius: '12px',
+                        background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'preferences' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                
+                <div>
+                  <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Monthly Budget Goal</h3>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '14px' }}>
+                    Set a preferred monthly spending limit to receive AI warnings.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <input 
+                      type="number" 
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="e.g. 5000"
+                      style={{ 
+                        flex: 1, padding: '12px 16px', borderRadius: '12px',
+                        background: 'var(--bg-primary)', border: '1px solid var(--glass-border)',
+                        color: 'var(--text-primary)', fontSize: '16px', outline: 'none', maxWidth: '300px'
+                      }}
+                    />
+                    <Button variant="primary" onClick={handleSaveBudget}>Save Goal</Button>
+                    {saveSuccess && <span style={{ color: 'var(--neon-cyan)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}><Shield size={14}/> Saved!</span>}
+                  </div>
+                </div>
+
+                <div style={{ paddingTop: '24px', borderTop: '1px solid var(--glass-border)' }}>
+                  <h3 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={20} style={{ color: 'var(--neon-violet)' }}/> Notifications
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                      <input type="checkbox" defaultChecked style={{ accentColor: 'var(--neon-cyan)', width: '18px', height: '18px' }} />
+                      <span>Email me weekly spending summaries</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                      <input type="checkbox" defaultChecked style={{ accentColor: 'var(--neon-magenta)', width: '18px', height: '18px' }} />
+                      <span>Alert me when nearing budget limits</span>
+                    </label>
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Analysis.jsx
+
+================================================================================
+
+import React, { useState, useEffect } from 'react';
+import { Card } from '../components/Card';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Activity, BarChart2 } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
+import { getTransactions } from '../services/api';
+
+export function Analysis() {
+  const { currency } = useCurrency();
+  const [transactions, setTransactions] = useState([]);
+  const [insights, setInsights] = useState({
+    totalIncome: 0,
+    totalExpense: 0,
+    netCashflow: 0,
+    topCategory: '',
+    avgDailySpend: 0
+  });
+  const [chartData, setChartData] = useState([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await getTransactions();
+        if (Array.isArray(data)) {
+          setTransactions(data);
+          analyzeData(data);
+        }
+      } catch (err) {
+        console.error('Failed to load transactions for analysis', err);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const analyzeData = (txs) => {
+    let income = 0;
+    let expense = 0;
+    const catTotals = {};
+    const dailyData = {};
+
+    txs.forEach(t => {
+      const amt = parseFloat(t.amount);
+      const dateStr = new Date(t.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+
+      if (!dailyData[dateStr]) {
+        dailyData[dateStr] = { date: dateStr, income: 0, expense: 0, timestamp: new Date(t.date).getTime() };
+      }
+
+      if (amt > 0) {
+        income += amt;
+        dailyData[dateStr].income += amt;
+      } else {
+        const absAmt = Math.abs(amt);
+        expense += absAmt;
+        dailyData[dateStr].expense += absAmt;
+        catTotals[t.category] = (catTotals[t.category] || 0) + absAmt;
+      }
+    });
+
+    let topCat = 'None';
+    let maxSpend = 0;
+    Object.keys(catTotals).forEach(cat => {
+      if (catTotals[cat] > maxSpend) {
+        maxSpend = catTotals[cat];
+        topCat = cat;
+      }
+    });
+
+    // Count just the days with expenses for average
+    let expenseDays = 0;
+    Object.values(dailyData).forEach(d => { if (d.expense > 0) expenseDays++; });
+    const avgDaily = expenseDays > 0 ? (expense / expenseDays) : 0;
+
+    const sortedChartData = Object.values(dailyData)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(item => ({ date: item.date, income: item.income, expense: item.expense }));
+
+    setChartData(sortedChartData);
+    setInsights({
+      totalIncome: income,
+      totalExpense: expense,
+      netCashflow: income - expense,
+      topCategory: topCat,
+      avgDailySpend: avgDaily
+    });
+  };
+
+  return (
+    <div className="dashboard-container">
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Activity size={28} className="neon-text-cyan" /> Advanced Analysis
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Deeper financial insights drawn from your historical spending.</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            <span>Net Cashflow</span>
+            <DollarSign size={20} className={insights.netCashflow >= 0 ? "neon-text-cyan" : "neon-text-magenta"} />
+          </div>
+          <h2 style={{ fontSize: '32px', margin: 0, color: insights.netCashflow >= 0 ? '#10b981' : 'var(--text-primary)' }}>
+            {insights.netCashflow >= 0 ? '+' : '-'}{currency}{Math.abs(insights.netCashflow).toFixed(2)}
+          </h2>
+        </Card>
+
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            <span>Top Cost Center</span>
+            <TrendingUp size={20} className="neon-text-magenta" />
+          </div>
+          <h2 style={{ fontSize: '28px', margin: 0 }}>
+            {insights.topCategory}
+          </h2>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Highest grossing expense category</p>
+        </Card>
+
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            <span>Avg Daily Spend</span>
+            <TrendingDown size={20} className="neon-text-violet" />
+          </div>
+          <h2 style={{ fontSize: '32px', margin: 0 }}>
+            {currency}{insights.avgDailySpend.toFixed(2)}
+          </h2>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Based on active transaction days</p>
+        </Card>
+      </div>
+
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: '500' }}>
+            <BarChart2 className="neon-text-cyan" /> Income vs. Expense Flow
+          </h3>
+        </div>
+        
+        <div style={{ width: '100%', height: '350px' }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer>
+              <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} barGap={6}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                <YAxis stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} tickFormatter={(value) => `${currency}${value}`} axisLine={false} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                  itemStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="income" name="Income" fill="var(--neon-cyan)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="expense" name="Expense" fill="var(--neon-magenta)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ display: 'flex', height: '100%', justifyContent: 'center', alignItems: 'center', color: 'var(--text-secondary)' }}>
+              No sufficient data to visualize. Add expenses to track trajectory!
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Auth.jsx
+
+================================================================================
+
+import React, { useState } from 'react';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { Sparkles, Mail, Lock, User, LayoutDashboard, Zap, ShieldCheck } from 'lucide-react';
+import { loginUser, registerUser } from '../services/api';
+import { ThemeToggle } from '../App';
+
+export function Auth({ onLogin }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      if (isLogin) {
+        const data = await loginUser({ email: formData.email, password: formData.password });
+        localStorage.setItem('spendora_token', data.token);
+        localStorage.setItem('spendora_user', JSON.stringify(data.user));
+        onLogin();
+      } else {
+        const data = await registerUser(formData);
+        localStorage.setItem('spendora_token', data.token);
+        localStorage.setItem('spendora_user', JSON.stringify(data.user));
+        onLogin();
+      }
+    } catch (err) {
+      if (err.message === 'Failed to fetch') {
+        setError('Unable to connect to the server. Please ensure XAMPP MySQL and the backend server are running.');
+      } else {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', background: 'var(--bg-primary)', flexWrap: 'wrap', position: 'relative' }}>
+      
+      <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
+        <ThemeToggle />
+      </div>
+
+      {/* Left Info Section */}
+      <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', padding: '64px', justifyContent: 'center', background: 'rgba(14, 165, 233, 0.05)', borderRight: '1px solid var(--glass-border)' }}>
+        <div className="logo neon-text-cyan" style={{ fontSize: '42px', marginBottom: '24px' }}>
+          <Sparkles size={42} /> Spendora
+        </div>
+        <h1 style={{ fontSize: '48px', marginBottom: '24px', lineHeight: 1.2 }}>
+          Master Your Finances <br/>with AI Precision
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '500px', marginBottom: '48px', lineHeight: 1.6 }}>
+          A futuristic financial companion that automatically categorizes transactions, tracks smart budgets, and provides AI insights.
+        </p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ padding: '12px', background: 'rgba(0, 240, 255, 0.1)', borderRadius: '12px', color: 'var(--neon-cyan)' }}>
+              <LayoutDashboard size={24} />
+            </div>
+            <div>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Smart Dashboard</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Track your daily spending and balances at a glance.</p>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ padding: '12px', background: 'rgba(255, 0, 60, 0.1)', borderRadius: '12px', color: 'var(--neon-magenta)' }}>
+              <Zap size={24} />
+            </div>
+            <div>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>AI-Powered Insights</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Get actionable advice to cut down wastage and save more.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ padding: '12px', background: 'rgba(138, 43, 226, 0.1)', borderRadius: '12px', color: 'var(--neon-violet)' }}>
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Bank-grade Security</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Your financial data is completely encrypted and secured.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Right Login Section */}
+      <div style={{ flex: '1 1 400px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+        <Card highlight style={{ width: '100%', maxWidth: '450px', padding: '48px' }}>
+          <h2 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '32px' }}>
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </h2>
+        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '32px' }}>
+          {isLogin ? 'Enter your details to access your dashboard.' : 'Start tracking your expenses like a pro.'}
+        </p>
+
+        {error && <p style={{ color: 'var(--neon-magenta)', textAlign: 'center', margin: '0 0 16px 0', background: 'rgba(255,0,60,0.1)', padding: '12px', borderRadius: '8px' }}>{error}</p>}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {!isLogin && (
+            <div style={{ position: 'relative' }}>
+              <User size={20} style={{ position: 'absolute', left: '16px', top: '14px', color: 'var(--text-secondary)' }} />
+              <input 
+                type="text"
+                name="name" 
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Full Name" 
+                required
+                style={{ 
+                  width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
+                  background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                  color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
+                }}
+              />
+            </div>
+          )}
+          
+          <div style={{ position: 'relative' }}>
+            <Mail size={20} style={{ position: 'absolute', left: '16px', top: '14px', color: 'var(--text-secondary)' }} />
+            <input 
+              type="email" 
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Email Address" 
+              required
+              style={{ 
+                width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
+              }}
+            />
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <Lock size={20} style={{ position: 'absolute', left: '16px', top: '14px', color: 'var(--text-secondary)' }} />
+            <input 
+              type="password" 
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Password" 
+              required
+              style={{ 
+                width: '100%', padding: '12px 16px 12px 48px', borderRadius: '12px',
+                background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                color: 'var(--text-primary)', fontSize: '16px', outline: 'none'
+              }}
+            />
+          </div>
+
+          <Button type="submit" variant="primary" style={{ marginTop: '12px', padding: '14px', fontSize: '16px' }}>
+            {isLogin ? 'Sign In' : 'Sign Up'}
+          </Button>
+        </form>
+
+        <div style={{ textAlign: 'center', marginTop: '32px', color: 'var(--text-secondary)', fontSize: '15px' }}>
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <span 
+            onClick={() => {setIsLogin(!isLogin); setError('');}} 
+            style={{ color: 'var(--neon-cyan)', cursor: 'pointer', fontWeight: '500' }}
+          >
+            {isLogin ? 'Sign up here' : 'Sign in here'}
+          </span>
+        </div>
+      </Card>
+      </div>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Dashboard.jsx
+
+================================================================================
+
+import React, { useState, useEffect } from 'react';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, Target } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useCurrency } from '../context/CurrencyContext';
+import { getTransactions, getInsights } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+
+export function Dashboard() {
+  const { currency } = useCurrency();
+  const navigate = useNavigate();
+  const [balance, setBalance] = useState(0);
+  const [spent, setSpent] = useState(0);
+  const [insight, setInsight] = useState(null);
+  const [categoryData, setCategoryData] = useState([]);
+  const [trendData, setTrendData] = useState([]);
+  const [badges, setBadges] = useState([]);
+  
+  const budget = parseFloat(localStorage.getItem('spendora_budget')) || 0;
+  const budgetPercent = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+  const isOverBudget = spent > budget && budget > 0;
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const txs = await getTransactions();
+        let bal = 0; let sp = 0;
+        const catTotals = {};
+
+        const tMap = {};
+        for(let i=29; i>=0; i--) {
+           const d = new Date();
+           d.setDate(d.getDate() - i);
+           const key = `${d.getMonth()+1}/${d.getDate()}`;
+           tMap[key] = { date: key, spent: 0, income: 0 };
+        }
+
+        if (Array.isArray(txs)) {
+          txs.forEach(t => {
+            const amt = parseFloat(t.amount);
+            bal += amt;
+            
+            const d = new Date(t.date);
+            const key = `${d.getMonth()+1}/${d.getDate()}`;
+            if(tMap[key]) {
+               if(amt < 0) tMap[key].spent += Math.abs(amt);
+               else tMap[key].income += amt;
+            }
+
+            if (amt < 0) {
+              const absAmt = Math.abs(amt);
+              sp += absAmt;
+              catTotals[t.category] = (catTotals[t.category] || 0) + absAmt;
+            }
+          });
+        }
+        
+        const catChartData = Object.keys(catTotals).map(key => ({
+          name: key,
+          value: catTotals[key]
+        }));
+        
+        let highestCat = ''; let maxAmt = 0;
+        for (const [cat, amount] of Object.entries(catTotals)) {
+           if(amount > maxAmt) { maxAmt = amount; highestCat = cat; }
+        }
+
+        const earnedBadges = [];
+        if (txs.length > 0) earnedBadges.push({ icon: '🌟', name: 'Starter', desc: 'Added first transaction' });
+        if (txs.length >= 10) earnedBadges.push({ icon: '🔥', name: 'Active Tracker', desc: 'Over 10 transactions' });
+        if (budget > 0 && sp < budget) earnedBadges.push({ icon: '👑', name: 'Saver Pro', desc: 'Under budget limit' });
+        if (highestCat === 'Food') earnedBadges.push({ icon: '🍔', name: 'Foodie', desc: 'Top spend: Food' });
+        if (highestCat === 'Shopping') earnedBadges.push({ icon: '🛍️', name: 'Shopper', desc: 'Top spend: Shopping' });
+        if (highestCat === 'Transport') earnedBadges.push({ icon: '🚗', name: 'Traveler', desc: 'Top spend: Transport' });
+
+        setBadges(earnedBadges);
+        setTrendData(Object.values(tMap));
+        setCategoryData(catChartData);
+        setBalance(bal);
+        setSpent(sp);
+
+        const ins = await getInsights();
+        if (ins.length > 0) setInsight(ins[0]);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const COLORS = ['#00f0ff', '#ff003c', '#8a2be2', '#00ff88', '#ffaa00'];
+
+  return (
+    <div className="dashboard-container">
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Overview</h1>
+          <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Track your daily spending and insights.</p>
+        </div>
+        <Button variant="primary" onClick={() => navigate('/transactions')}>+ Add Transaction</Button>
+      </div>
+
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+        <Card>
+          <div className="stat-header" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Total Balance</span>
+            <Wallet size={20} className="neon-text-violet" />
+          </div>
+          <h2 style={{ fontSize: '36px', margin: '16px 0 8px 0', fontWeight: '500' }}>{currency}{balance.toFixed(2)}</h2>
+          <div className="stat-trend" style={{ color: '#00ff88', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+            <ArrowUpRight size={16} /> <span style={{color: 'var(--text-secondary)'}}>Last 30 days</span>
+          </div>
+        </Card>
+        
+        <Card>
+          <div className="stat-header" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Total Spending</span>
+            <DollarSign size={20} className="neon-text-magenta" />
+          </div>
+          <h2 style={{ fontSize: '36px', margin: '16px 0 8px 0', fontWeight: '500' }}>{currency}{spent.toFixed(2)}</h2>
+          <div className="stat-trend" style={{ color: 'var(--neon-magenta)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+            <ArrowDownRight size={16} /> <span style={{color: 'var(--text-secondary)'}}>Last 30 days</span>
+          </div>
+        </Card>
+
+        {insight && (
+          <Card highlight>
+            <div className="stat-header" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+              <span>AI Spotlight</span>
+              <span className="neon-text-cyan" style={{ fontSize: '20px' }}>✨</span>
+            </div>
+            <p style={{ margin: '16px 0 0 0', lineHeight: '1.6', fontSize: '15px' }}>
+              <strong className="neon-text-magenta">{insight.title}</strong>: {insight.description}
+            </p>
+          </Card>
+        )}
+      </div>
+
+      {badges.length > 0 && (
+        <Card style={{ marginBottom: '24px', background: 'rgba(138, 43, 226, 0.05)', border: '1px solid var(--neon-violet)' }}>
+          <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-violet)' }}>
+            Smart Badges Achieved
+          </h3>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {badges.map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--glass-border)', flex: '1 1 auto', minWidth: '150px' }}>
+                <span style={{ fontSize: '24px' }}>{b.icon}</span>
+                <div>
+                  <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{b.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{b.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="charts-area">
+        {budget > 0 && (
+          <Card style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Target size={18} className="neon-text-cyan" /> Monthly Budget Goal
+              </h3>
+              <span style={{ color: isOverBudget ? 'var(--neon-magenta)' : 'var(--text-secondary)' }}>
+                {currency}{spent.toFixed(2)} / {currency}{budget.toFixed(2)}
+              </span>
+            </div>
+            <div style={{ width: '100%', height: '12px', background: 'var(--bg-secondary)', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ 
+                height: '100%', 
+                width: `${budgetPercent}%`, 
+                background: isOverBudget ? 'var(--neon-magenta)' : 'var(--neon-cyan)',
+                transition: 'width 0.5s ease-out',
+                boxShadow: isOverBudget ? '0 0 10px var(--neon-magenta)' : '0 0 10px var(--neon-cyan)'
+              }}></div>
+            </div>
+          </Card>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+          
+          <Card className="chart-card">
+            <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>30-Day Spending Trend</h3>
+            <div style={{ width: '100%', height: '300px' }}>
+              <ResponsiveContainer>
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--neon-magenta)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--neon-magenta)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--neon-cyan)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--neon-cyan)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${currency}${v}`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Area type="monotone" dataKey="spent" name="Spent" stroke="var(--neon-magenta)" fillOpacity={1} fill="url(#colorSpent)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="income" name="Income" stroke="var(--neon-cyan)" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card className="chart-card">
+            <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>Spending by Category</h3>
+            <div style={{ width: '100%', height: '300px' }}>
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
+                      itemStyle={{ color: 'var(--text-primary)' }}
+                      formatter={(value) => `${currency}${value.toFixed(2)}`}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ color: 'var(--text-secondary)', textAlign: 'center', marginTop: '100px' }}>No spending data yet.</div>
+              )}
+            </div>
+          </Card>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Insights.jsx
+
+================================================================================
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { Sparkles, Send, User, Bot, AlertCircle } from 'lucide-react';
+import { chatWithAi } from '../services/api';
+
+export function Insights() {
+  const [messages, setMessages] = useState([
+    { id: 1, role: 'ai', text: 'Hello! I am your Spendora AI financial assistant. Ask me anything about your spending, budgets, or get a quick analysis of your recent transactions!' }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const endOfMessagesRef = useRef(null);
+
+  const scrollToBottom = () => {
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = { id: Date.now(), role: 'user', text: input.trim() };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const response = await chatWithAi(userMessage.text);
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: response.message }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'error', text: 'Failed to connect to AI: ' + err.message }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="dashboard-container" style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+        <Sparkles className="neon-text-cyan" size={32} />
+        <h1 style={{ margin: 0 }}>Ask Spendora AI</h1>
+      </div>
+      
+      <Card style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {messages.map((msg) => (
+            <div 
+              key={msg.id} 
+              style={{
+                display: 'flex',
+                gap: '12px',
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%'
+              }}
+            >
+              {msg.role !== 'user' && (
+                <div style={{ padding: '8px', background: 'rgba(0, 240, 255, 0.1)', borderRadius: '12px', height: 'fit-content' }}>
+                  {msg.role === 'error' ? <AlertCircle size={24} className="neon-text-magenta" /> : <Bot size={24} className="neon-text-cyan" />}
+                </div>
+              )}
+              
+              <div style={{
+                background: msg.role === 'user' ? 'var(--neon-violet)' : 'var(--bg-secondary)',
+                color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
+                padding: '16px 20px',
+                borderRadius: '16px',
+                borderBottomRightRadius: msg.role === 'user' ? '4px' : '16px',
+                borderBottomLeftRadius: msg.role !== 'user' ? '4px' : '16px',
+                border: msg.role !== 'user' ? '1px solid var(--glass-border)' : 'none',
+                boxShadow: msg.role === 'user' ? '0 4px 12px rgba(138, 43, 226, 0.3)' : 'none',
+                lineHeight: '1.6'
+              }}>
+                {msg.text.split('\n').map((line, i) => (
+                  <React.Fragment key={i}>
+                    {line}
+                    {i !== msg.text.split('\n').length - 1 && <br />}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div style={{ display: 'flex', gap: '12px', alignSelf: 'flex-start' }}>
+              <div style={{ padding: '8px', background: 'rgba(0, 240, 255, 0.1)', borderRadius: '12px', height: 'fit-content' }}>
+                 <Bot size={24} className="neon-text-cyan" />
+              </div>
+              <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
+                Thinking...
+              </div>
+            </div>
+          )}
+          <div ref={endOfMessagesRef} />
+        </div>
+
+        <div style={{ marginTop: '16px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+          <form onSubmit={handleSend} style={{ display: 'flex', gap: '12px' }}>
+            <input 
+              type="text" 
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="E.g., Analyze my spending this month..."
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                background: 'var(--glass-bg)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--glass-border)',
+                padding: '16px 20px',
+                borderRadius: '24px',
+                outline: 'none',
+                fontSize: '16px'
+              }}
+            />
+            <Button type="submit" variant="primary" style={{ borderRadius: '24px', padding: '0 24px', display: 'flex', alignItems: 'center', gap: '8px' }} disabled={isLoading || !input.trim()}>
+              <Send size={18} /> Send
+            </Button>
+          </form>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\pages\Transactions.jsx
+
+================================================================================
+
+import React, { useState, useEffect } from 'react';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { DollarSign, ShoppingBag, Coffee, Car, Upload, Download, Trash2, Sparkles } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
+import { getTransactions, addTransaction, addBulkTransactions, deleteTransaction, editTransaction, chatWithAi } from '../services/api';
+
+const icons = {
+  Shopping: <ShoppingBag size={20} className="neon-text-cyan" />,
+  Food: <Coffee size={20} className="neon-text-magenta" />,
+  Transport: <Car size={20} className="neon-text-violet" />,
+  Other: <DollarSign size={20} />
+};
+
+export function Transactions() {
+  const { currency } = useCurrency();
+  const fileInputRef = React.useRef();
+  const [transactions, setTransactions] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [formData, setFormData] = useState({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [aiAdvice, setAiAdvice] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const loadTxs = async () => {
+    try {
+      const data = await getTransactions();
+      setTransactions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteTransaction(id);
+      loadTxs();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadTxs();
+  }, []);
+
+  const handleAddOrEdit = async (e) => {
+    e.preventDefault();
+    try {
+      let finalAmount = Math.abs(parseFloat(formData.amount));
+      if (formData.type === 'expense') finalAmount = -finalAmount;
+
+      const payload = {
+        name: formData.name,
+        category: formData.category,
+        amount: finalAmount,
+        walletType: formData.walletType,
+        date: formData.date ? new Date(formData.date).toISOString() : new Date().toISOString()
+      };
+
+      if (editingId) {
+        await editTransaction(editingId, payload);
+      } else {
+        await addTransaction(payload);
+      }
+      
+      setShowAdd(false);
+      setEditingId(null);
+      setFormData({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
+      loadTxs();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditClick = (tx) => {
+    setEditingId(tx.id || tx._id);
+    const amt = parseFloat(tx.amount);
+    setFormData({
+      type: amt >= 0 ? 'income' : 'expense',
+      name: tx.name,
+      category: tx.category,
+      amount: Math.abs(amt).toString(),
+      walletType: tx.walletType || 'Cash',
+      date: new Date(tx.date).toISOString().split('T')[0]
+    });
+    setShowAdd(true);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target.result;
+        const lines = text.split('\n');
+        const newTxs = [];
+        // Format expected: Date,Name,Category,Amount
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          if (parts.length >= 4) {
+             const [date, name, category, amount] = parts;
+             newTxs.push({
+               date: new Date(date),
+               name: name.trim(),
+               category: category.trim() || 'Other',
+               amount: parseFloat(amount)
+             });
+          }
+        }
+        if (newTxs.length > 0) {
+          await addBulkTransactions(newTxs);
+          loadTxs();
+        }
+      } catch (err) {
+        console.error('Parsing CSS error:', err);
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    e.target.value = null;
+  };
+
+  const handleExportCSV = () => {
+    if (transactions.length === 0) return;
+    
+    let csvContent = "data:text/csv;charset=utf-8,Name,Category,Amount,Date\n";
+    
+    transactions.forEach(tx => {
+      const name = `"${tx.name.replace(/"/g, '""')}"`;
+      const category = `"${tx.category.replace(/"/g, '""')}"`;
+      const amount = tx.amount;
+      const date = new Date(tx.date).toLocaleDateString();
+      csvContent += `${name},${category},${amount},${date}\n`;
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `spendora_transactions_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredTransactions = transactions.filter(tx => {
+    const txDate = new Date(tx.date);
+    txDate.setHours(0, 0, 0, 0); // Normalize to midnight for accurate comparisons
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      if (txDate.getTime() < start.getTime()) return false;
+    }
+    
+    if (endDate) {
+       const end = new Date(endDate);
+       end.setHours(23, 59, 59, 999);
+       if (txDate.getTime() > end.getTime()) return false;
+    }
+    return tx.category.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const handleGetAiAdvice = async () => {
+    if (filteredTransactions.length === 0) return;
+    setIsAiLoading(true);
+    setAiAdvice('');
+    
+    try {
+      const summary = filteredTransactions.slice(0, 30).map(t => `${t.name} (${t.category}): ${t.amount}`).join(', ');
+      const query = `Please review these specific transactions and give me 2 concise, highly actionable financial tips or observations about my spending patterns: ${summary}`;
+      const response = await chatWithAi(query);
+      setAiAdvice(response.message);
+    } catch (err) {
+      setAiAdvice('Failed to get AI advice: ' + err.message);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  return (
+    <div className="transactions-container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <h1 style={{ margin: 0 }}>Transactions</h1>
+        
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', outline: 'none' }} 
+            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>From:</span>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
+              <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>To:</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Button variant="outline" onClick={handleGetAiAdvice} disabled={isAiLoading || filteredTransactions.length === 0} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-cyan)', borderColor: 'var(--neon-cyan)' }}>
+              <Sparkles size={16} /> {isAiLoading ? 'Analyzing...' : 'AI Review'}
+            </Button>
+            <Button variant="outline" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Download size={16} /> Export CSV
+            </Button>
+            <input 
+              type="file" 
+              accept=".csv" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              style={{ display: 'none' }} 
+            />
+            <Button variant="secondary" onClick={() => fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Upload size={16} /> Upload CSV
+            </Button>
+            <Button onClick={() => {
+              if (showAdd && editingId) {
+                setEditingId(null);
+                setFormData({ type: 'expense', name: '', category: 'Food', amount: '', walletType: 'Cash', date: '' });
+              }
+              setShowAdd(!showAdd);
+            }}>{showAdd ? 'Cancel' : '+ Add Transaction'}</Button>
+          </div>
+        </div>
+      </div>
+
+      {showAdd && (
+        <Card highlight style={{ marginBottom: '24px' }}>
+          <form onSubmit={handleAddOrEdit} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ minWidth: '120px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+              <option value="expense" style={{background: 'var(--bg-primary)'}}>Expense</option>
+              <option value="income" style={{background: 'var(--bg-primary)'}}>Income</option>
+            </select>
+            <input type="text" placeholder="Title" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ flex: 1, minWidth: '200px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
+            <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+              <option value="Shopping" style={{background: 'var(--bg-primary)'}}>Shopping</option>
+              <option value="Food" style={{background: 'var(--bg-primary)'}}>Food</option>
+              <option value="Transport" style={{background: 'var(--bg-primary)'}}>Transport</option>
+              <option value="Other" style={{background: 'var(--bg-primary)'}}>Other</option>
+            </select>
+            <select value={formData.walletType} onChange={e => setFormData({...formData, walletType: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+              <option value="Cash" style={{background: 'var(--bg-primary)'}}>Cash</option>
+              <option value="Credit Card" style={{background: 'var(--bg-primary)'}}>Credit Card</option>
+              <option value="Bank Account" style={{background: 'var(--bg-primary)'}}>Bank</option>
+            </select>
+            <input type="number" step="0.01" min="0" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} style={{ minWidth: '110px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
+            <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={{ minWidth: '130px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }} />
+            <Button type="submit" variant="primary">Save</Button>
+          </form>
+        </Card>
+      )}
+
+      {(aiAdvice || isAiLoading) && (
+        <Card highlight style={{ marginBottom: '24px', background: 'rgba(0, 240, 255, 0.05)', border: '1px solid var(--neon-cyan)' }}>
+           <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-cyan)' }}>
+             <Sparkles size={20} /> AI Financial Advice
+           </h3>
+           <div style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+             {isAiLoading ? 'Analyzing your filtered transactions...' : aiAdvice.split('\n').map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i !== aiAdvice.split('\n').length - 1 && <br />}
+                </span>
+             ))}
+           </div>
+        </Card>
+      )}
+
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+               <th style={{ padding: '16px 24px' }}>Transaction</th>
+               <th style={{ padding: '16px 24px' }}>Category</th>
+               <th style={{ padding: '16px 24px' }}>Wallet</th>
+               <th style={{ padding: '16px 24px' }}>Date</th>
+               <th style={{ padding: '16px 24px', textAlign: 'right' }}>Amount</th>
+               <th style={{ padding: '16px 24px' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTransactions.map(tx => {
+              const amt = parseFloat(tx.amount);
+              return (
+              <tr key={tx.id || tx._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }}>
+                <td style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                    {icons[tx.category] || icons['Other']}
+                  </div>
+                  <strong style={{ fontSize: '16px' }}>{tx.name}</strong>
+                </td>
+                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>{tx.category}</td>
+                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                  <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '12px' }}>
+                    {tx.walletType || 'Cash'}
+                  </span>
+                </td>
+                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>{new Date(tx.date).toLocaleDateString()}</td>
+                <td style={{ padding: '16px 24px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px', color: amt > 0 ? '#10b981' : 'var(--text-primary)' }}>
+                  {amt > 0 ? '+' : ''}{amt < 0 ? '-' : ''}{currency}{Math.abs(amt).toFixed(2)}
+                </td>
+                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <Button variant="outline" onClick={() => handleEditClick(tx)} style={{ padding: '8px', color: 'var(--neon-cyan)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                      Edit
+                    </Button>
+                    <Button variant="outline" onClick={() => handleDelete(tx.id || tx._id)} style={{ padding: '8px', borderColor: 'rgba(255,0,60,0.3)', color: 'var(--neon-magenta)', display: 'flex', justifyContent: 'center' }}>
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+              );
+            })}
+            {transactions.length === 0 && (
+              <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No transactions yet. Add one above.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\services\api.js
+
+================================================================================
+
+const API_URL = 'http://localhost:8081/api';
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('spendora_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
+
+export const registerUser = async (userData) => {
+  const res = await fetch(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  });
+  if (!res.ok) throw new Error((await res.json()).msg || 'Registration failed');
+  return res.json();
+};
+
+export const loginUser = async (credentials) => {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials)
+  });
+  if (!res.ok) throw new Error((await res.json()).msg || 'Login failed');
+  return res.json();
+};
+
+export const getTransactions = async () => {
+  const res = await fetch(`${API_URL}/transactions`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to fetch transactions');
+  return res.json();
+};
+
+export const addTransaction = async (txData) => {
+  const res = await fetch(`${API_URL}/transactions`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(txData)
+  });
+  if (!res.ok) throw new Error('Failed to add transaction');
+  return res.json();
+};
+
+export const addBulkTransactions = async (transactions) => {
+  const res = await fetch(`${API_URL}/transactions/bulk`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ transactions })
+  });
+  if (!res.ok) throw new Error('Failed to add bulk transactions');
+  return res.json();
+};
+
+export const getInsights = async () => {
+  const res = await fetch(`${API_URL}/insights`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to fetch insights');
+  return res.json();
+};
+
+export const chatWithAi = async (query) => {
+  const res = await fetch(`${API_URL}/insights/chat`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ query })
+  });
+  if (!res.ok) throw new Error('Failed to process AI chat');
+  return res.json();
+};
+
+export const deleteTransaction = async (id) => {
+  const res = await fetch(`${API_URL}/transactions/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to delete transaction');
+  return res.json();
+};
+
+export const editTransaction = async (id, txData) => {
+  const res = await fetch(`${API_URL}/transactions/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(txData)
+  });
+  if (!res.ok) throw new Error('Failed to edit transaction');
+  return res.json();
+};
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\App.css
+
+================================================================================
+
+.spendora-app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 280px;
+  height: calc(100vh - 32px);
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.logo {
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nav-links a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 16px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.nav-links a:hover, .nav-links a.active {
+  color: var(--text-primary);
+  background: rgba(14, 165, 233, 0.1);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.15);
+  border-left: 3px solid var(--neon-cyan);
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 16px 0;
+  overflow: hidden;
+}
+
+.topbar {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  margin-bottom: 24px;
+}
+
+.topbar h2 {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.user-profile {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+}
+
+.page-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px; /* For scrollbar */
+}
+
+/* Scrollbar styling */
+.page-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+.page-wrapper::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+.page-wrapper::-webkit-scrollbar-thumb {
+  background: var(--glass-border-highlight);
+  border-radius: 10px;
+}
+.page-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .spendora-app {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    margin: 0;
+    flex-direction: row;
+    padding: 0 16px;
+    align-items: center;
+    border-radius: 20px 20px 0 0;
+    z-index: 1000;
+    box-sizing: border-box;
+  }
+
+  .logo {
+    display: none;
+  }
+
+  .nav-links {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    gap: 0;
+  }
+
+  .nav-links a {
+    flex-direction: column;
+    padding: 8px;
+    font-size: 11px;
+    gap: 4px;
+    border-left: none;
+  }
+
+  .nav-links a:hover, .nav-links a.active {
+    border-left: none;
+    border-top: 3px solid var(--neon-cyan);
+    background: transparent;
+  }
+
+  .main-content {
+    padding: 16px;
+    padding-bottom: 90px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    height: 60px;
+  }
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\App.jsx
+
+================================================================================
+
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Wallet, Activity, Sparkles, User, TrendingUp, Sun, Moon } from 'lucide-react';
+import './App.css';
+
+export function ThemeToggle() {
+  const [theme, setTheme] = useState(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('spendora_theme', newTheme);
+    setTheme(newTheme);
+  };
+
+  // Sync state if initialized before useEffect sets document attribute
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div 
+      onClick={toggleTheme}
+      style={{ 
+        display: 'flex', alignItems: 'center', width: '60px', height: '30px', 
+        background: 'var(--bg-secondary)', borderRadius: '15px', 
+        border: '1px solid var(--glass-border)', position: 'relative', cursor: 'pointer',
+        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden'
+      }}
+      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+    >
+      <div style={{ position: 'absolute', left: '6px', color: 'var(--text-secondary)' }}><Moon size={14} /></div>
+      <div style={{ position: 'absolute', right: '6px', color: 'var(--text-secondary)' }}><Sun size={14} /></div>
+      
+      <div style={{
+        position: 'absolute', top: '2px', left: theme === 'dark' ? '4px' : '32px',
+        width: '24px', height: '24px', borderRadius: '50%', background: 'var(--text-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', zIndex: 2,
+        color: 'var(--bg-primary)'
+      }}>
+        {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+      </div>
+    </div>
+  );
+}
+import { Dashboard } from './pages/Dashboard';
+import { Transactions } from './pages/Transactions';
+import { Insights } from './pages/Insights';
+import { Analysis } from './pages/Analysis';
+import { Auth } from './pages/Auth';
+import { Account } from './pages/Account';
+import { CurrencyProvider, useCurrency } from './context/CurrencyContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+function NavLinks() {
+  const location = useLocation();
+  
+  return (
+    <ul className="nav-links">
+      <li>
+        <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+          <LayoutDashboard size={20} /> Dashboard
+        </Link>
+      </li>
+      <li>
+        <Link to="/transactions" className={location.pathname === '/transactions' ? 'active' : ''}>
+          <Wallet size={20} /> Transactions
+        </Link>
+      </li>
+      <li>
+        <Link to="/insights" className={location.pathname === '/insights' ? 'active' : ''}>
+          <Activity size={20} /> AI Insights
+        </Link>
+      </li>
+      <li>
+        <Link to="/analysis" className={location.pathname === '/analysis' ? 'active' : ''}>
+          <TrendingUp size={20} /> Analysis
+        </Link>
+      </li>
+      <li>
+        <Link to="/account" className={location.pathname === '/account' ? 'active' : ''}>
+          <User size={20} /> Account
+        </Link>
+      </li>
+    </ul>
+  );
+}
+
+function TopBar({ onLogout }) {
+  const { currency, setCurrency } = useCurrency();
+  let user = { name: 'Guest' };
+  try {
+    const rawUser = localStorage.getItem('spendora_user');
+    if (rawUser && rawUser !== 'undefined') user = JSON.parse(rawUser);
+  } catch (e) {
+    console.error('Failed to parse user', e);
+  }
+  
+  return (
+    <header className="glass-panel topbar">
+      <h2>Welcome back, {user?.name || 'Guest'}</h2>
+      <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
+        
+        {/* Superior Theme Toggle Switch */}
+        <ThemeToggle />
+        
+        <select 
+          value={currency} 
+          onChange={(e) => setCurrency(e.target.value)}
+          style={{ 
+            background: 'var(--glass-bg)', color: 'var(--text-primary)', 
+            border: '1px solid var(--glass-border)', padding: '8px 12px', 
+            borderRadius: '8px', outline: 'none', cursor: 'pointer' 
+          }}
+        >
+          <option style={{background: 'var(--bg-primary)'}} value="$">USD ($)</option>
+          <option style={{background: 'var(--bg-primary)'}} value="€">EUR (€)</option>
+          <option style={{background: 'var(--bg-primary)'}} value="£">GBP (£)</option>
+          <option style={{background: 'var(--bg-primary)'}} value="₹">INR (₹)</option>
+          <option style={{background: 'var(--bg-primary)'}} value="¥">JPY (¥)</option>
+        </select>
+        <div 
+          onClick={onLogout} 
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px',
+            background: 'rgba(255, 0, 60, 0.1)', color: 'var(--neon-magenta)',
+            borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255, 0, 60, 0.3)',
+            fontWeight: '500', transition: 'all 0.2s'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 0, 60, 0.2)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 0, 60, 0.1)'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Logout
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('spendora_token'));
+
+  const handleLogout = () => {
+    localStorage.removeItem('spendora_token');
+    localStorage.removeItem('spendora_user');
+    setIsAuthenticated(false);
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('spendora_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  const handleLogin = () => {
+    window.history.replaceState(null, '', '/');
+    setIsAuthenticated(true);
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="spendora-app">
+        <Auth onLogin={handleLogin} />
+      </div>
+    );
+  }
+
+  return (
+    <CurrencyProvider>
+      <Router>
+        <div className="spendora-app">
+          {/* Navigation Sidebar */}
+          <nav className="glass-panel sidebar">
+            <div className="logo neon-text-cyan">
+              <Sparkles size={24} /> Spendora
+            </div>
+            <NavLinks />
+          </nav>
+          
+          {/* Main Content Area */}
+          <main className="main-content">
+            <TopBar onLogout={handleLogout} />
+            
+            <div className="page-wrapper">
+             <Routes>
+               <Route path="/" element={<Dashboard />} />
+               <Route path="/transactions" element={<ErrorBoundary><Transactions /></ErrorBoundary>} />
+               <Route path="/insights" element={<Insights />} />
+               <Route path="/analysis" element={<Analysis />} />
+               <Route path="/account" element={<Account />} />
+             </Routes>
+          </div>
+        </main>
+      </div>
+      </Router>
+    </CurrencyProvider>
+  );
+}
+
+export default App;
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\index.css
+
+================================================================================
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  
+  --neon-cyan: #0ea5e9;
+  --neon-magenta: #e11d48;
+  --neon-violet: #8b5cf6;
+  
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-border-highlight: rgba(139, 92, 246, 0.5);
+  --glass-blur: blur(24px);
+  
+  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff003c;
+  --neon-violet: #b53cff;
+  
+  --glass-bg: rgba(15, 23, 42, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-highlight: rgba(0, 240, 255, 0.5);
+  
+  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.22), transparent 55%),
+    radial-gradient(circle at 90% 30%, rgba(14, 165, 233, 0.22), transparent 55%),
+    radial-gradient(circle at 50% 85%, rgba(139, 92, 246, 0.15), transparent 50%);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  transition: border 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.glass-panel:hover {
+  border: 1px solid var(--glass-border-highlight);
+  box-shadow: 0 15px 45px -10px rgba(14, 165, 233, 0.15);
+  transform: translateY(-2px);
+}
+
+.neon-text-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+}
+
+.neon-text-magenta {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 10px rgba(225, 29, 72, 0.2);
+}
+
+.p-6 {
+  padding: 1.5rem;
+}
+
+/* Sidebar upgrades */
+.sidebar {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.05);
+}
+
+[data-theme='dark'] body {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.1), transparent 55%),
+    radial-gradient(circle at 90% 30%, rgba(0, 240, 255, 0.1), transparent 55%),
+    radial-gradient(circle at 50% 85%, rgba(255, 0, 60, 0.1), transparent 50%);
+}
+
+
+
+================================================================================
+
+File: E:\fullstack\Smart-Expense-Tracker\spendora-frontend\src\main.jsx
+
+================================================================================
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+
+

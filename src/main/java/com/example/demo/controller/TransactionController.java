@@ -69,4 +69,20 @@ public class TransactionController {
         transactionRepository.delete(tx);
         return ResponseEntity.ok(Map.of("msg", "Deleted"));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> editTransaction(@RequestHeader("Authorization") String authHeader, @PathVariable Long id, @RequestBody Transaction newTxData) {
+        Long userId = getUserIdFromToken(authHeader);
+        Transaction tx = transactionRepository.findById(id).orElse(null);
+        if (tx == null) return ResponseEntity.status(404).body(Map.of("msg", "Not found"));
+        if (!tx.getUserId().equals(userId)) return ResponseEntity.status(401).body(Map.of("msg", "Not authorized"));
+        
+        tx.setName(newTxData.getName());
+        tx.setCategory(newTxData.getCategory());
+        tx.setAmount(newTxData.getAmount());
+        if(newTxData.getWalletType() != null && !newTxData.getWalletType().isEmpty()) tx.setWalletType(newTxData.getWalletType());
+        if(newTxData.getDate() != null) tx.setDate(newTxData.getDate());
+        
+        return ResponseEntity.ok(transactionRepository.save(tx));
+    }
 }

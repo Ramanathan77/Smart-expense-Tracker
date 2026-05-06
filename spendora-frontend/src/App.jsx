@@ -1,7 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Activity, Sparkles, User, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Wallet, Activity, Sparkles, User, TrendingUp, Sun, Moon } from 'lucide-react';
 import './App.css';
+
+export function ThemeToggle() {
+  const [theme, setTheme] = useState(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('spendora_theme', newTheme);
+    setTheme(newTheme);
+  };
+
+  // Sync state if initialized before useEffect sets document attribute
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div 
+      onClick={toggleTheme}
+      style={{ 
+        display: 'flex', alignItems: 'center', width: '60px', height: '30px', 
+        background: 'var(--bg-secondary)', borderRadius: '15px', 
+        border: '1px solid var(--glass-border)', position: 'relative', cursor: 'pointer',
+        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden'
+      }}
+      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+    >
+      <div style={{ position: 'absolute', left: '6px', color: 'var(--text-secondary)' }}><Moon size={14} /></div>
+      <div style={{ position: 'absolute', right: '6px', color: 'var(--text-secondary)' }}><Sun size={14} /></div>
+      
+      <div style={{
+        position: 'absolute', top: '2px', left: theme === 'dark' ? '4px' : '32px',
+        width: '24px', height: '24px', borderRadius: '50%', background: 'var(--text-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', zIndex: 2,
+        color: 'var(--bg-primary)'
+      }}>
+        {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+      </div>
+    </div>
+  );
+}
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Insights } from './pages/Insights';
@@ -59,6 +105,10 @@ function TopBar({ onLogout }) {
     <header className="glass-panel topbar">
       <h2>Welcome back, {user?.name || 'Guest'}</h2>
       <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
+        
+        {/* Superior Theme Toggle Switch */}
+        <ThemeToggle />
+        
         <select 
           value={currency} 
           onChange={(e) => setCurrency(e.target.value)}
@@ -102,10 +152,20 @@ function App() {
     setIsAuthenticated(false);
   };
 
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('spendora_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  const handleLogin = () => {
+    window.history.replaceState(null, '', '/');
+    setIsAuthenticated(true);
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="spendora-app">
-        <Auth onLogin={() => setIsAuthenticated(true)} />
+        <Auth onLogin={handleLogin} />
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Sparkles, Mail, Lock, User, LayoutDashboard, Zap, ShieldCheck } from 'lucide-react';
 import { loginUser, registerUser } from '../services/api';
+import { ThemeToggle } from '../App';
 
 export function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -38,8 +39,12 @@ export function Auth({ onLogin }) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', background: 'var(--bg-primary)', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', background: 'var(--bg-primary)', flexWrap: 'wrap', position: 'relative' }}>
       
+      <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
+        <ThemeToggle />
+      </div>
+
       {/* Left Info Section */}
       <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', padding: '64px', justifyContent: 'center', background: 'rgba(14, 165, 233, 0.05)', borderRight: '1px solid var(--glass-border)' }}>
         <div className="logo neon-text-cyan" style={{ fontSize: '42px', marginBottom: '24px' }}>

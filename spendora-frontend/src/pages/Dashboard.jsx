@@ -14,6 +14,8 @@ export function Dashboard() {
   const [spent, setSpent] = useState(0);
   const [insight, setInsight] = useState(null);
   const [categoryData, setCategoryData] = useState([]);
+  const [trendData, setTrendData] = useState([]);
+  const [badges, setBadges] = useState([]);
   
   const budget = parseFloat(localStorage.getItem('spendora_budget')) || 0;
   const budgetPercent = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
@@ -26,10 +28,26 @@ export function Dashboard() {
         let bal = 0; let sp = 0;
         const catTotals = {};
 
+        const tMap = {};
+        for(let i=29; i>=0; i--) {
+           const d = new Date();
+           d.setDate(d.getDate() - i);
+           const key = `${d.getMonth()+1}/${d.getDate()}`;
+           tMap[key] = { date: key, spent: 0, income: 0 };
+        }
+
         if (Array.isArray(txs)) {
           txs.forEach(t => {
             const amt = parseFloat(t.amount);
             bal += amt;
+            
+            const d = new Date(t.date);
+            const key = `${d.getMonth()+1}/${d.getDate()}`;
+            if(tMap[key]) {
+               if(amt < 0) tMap[key].spent += Math.abs(amt);
+               else tMap[key].income += amt;
+            }
+
             if (amt < 0) {
               const absAmt = Math.abs(amt);
               sp += absAmt;
@@ -43,6 +61,21 @@ export function Dashboard() {
           value: catTotals[key]
         }));
         
+        let highestCat = ''; let maxAmt = 0;
+        for (const [cat, amount] of Object.entries(catTotals)) {
+           if(amount > maxAmt) { maxAmt = amount; highestCat = cat; }
+        }
+
+        const earnedBadges = [];
+        if (txs.length > 0) earnedBadges.push({ icon: '🌟', name: 'Starter', desc: 'Added first transaction' });
+        if (txs.length >= 10) earnedBadges.push({ icon: '🔥', name: 'Active Tracker', desc: 'Over 10 transactions' });
+        if (budget > 0 && sp < budget) earnedBadges.push({ icon: '👑', name: 'Saver Pro', desc: 'Under budget limit' });
+        if (highestCat === 'Food') earnedBadges.push({ icon: '🍔', name: 'Foodie', desc: 'Top spend: Food' });
+        if (highestCat === 'Shopping') earnedBadges.push({ icon: '🛍️', name: 'Shopper', desc: 'Top spend: Shopping' });
+        if (highestCat === 'Transport') earnedBadges.push({ icon: '🚗', name: 'Traveler', desc: 'Top spend: Transport' });
+
+        setBadges(earnedBadges);
+        setTrendData(Object.values(tMap));
         setCategoryData(catChartData);
         setBalance(bal);
         setSpent(sp);
@@ -104,6 +137,25 @@ export function Dashboard() {
         )}
       </div>
 
+      {badges.length > 0 && (
+        <Card style={{ marginBottom: '24px', background: 'rgba(138, 43, 226, 0.05)', border: '1px solid var(--neon-violet)' }}>
+          <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neon-violet)' }}>
+            Smart Badges Achieved
+          </h3>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {badges.map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--glass-border)', flex: '1 1 auto', minWidth: '150px' }}>
+                <span style={{ fontSize: '24px' }}>{b.icon}</span>
+                <div>
+                  <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{b.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{b.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div className="charts-area">
         {budget > 0 && (
           <Card style={{ marginBottom: '24px' }}>
@@ -127,7 +179,36 @@ export function Dashboard() {
           </Card>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+          
+          <Card className="chart-card">
+            <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>30-Day Spending Trend</h3>
+            <div style={{ width: '100%', height: '300px' }}>
+              <ResponsiveContainer>
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--neon-magenta)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--neon-magenta)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--neon-cyan)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--neon-cyan)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${currency}${v}`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Area type="monotone" dataKey="spent" name="Spent" stroke="var(--neon-magenta)" fillOpacity={1} fill="url(#colorSpent)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="income" name="Income" stroke="var(--neon-cyan)" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
           <Card className="chart-card">
             <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>Spending by Category</h3>
             <div style={{ width: '100%', height: '300px' }}>
@@ -152,6 +233,7 @@ export function Dashboard() {
               )}
             </div>
           </Card>
+
         </div>
       </div>
     </div>

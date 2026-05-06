@@ -82,3 +82,13 @@ export const deleteTransaction = async (id) => {
   if (!res.ok) throw new Error('Failed to delete transaction');
   return res.json();
 };
+
+export const editTransaction = async (id, txData) => {
+  const res = await fetch(`${API_URL}/transactions/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(txData)
+  });
+  if (!res.ok) throw new Error('Failed to edit transaction');
+  return res.json();
+};

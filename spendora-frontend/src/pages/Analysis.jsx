@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/Card';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Activity, BarChart2 } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { getTransactions } from '../services/api';
 
@@ -36,23 +36,24 @@ export function Analysis() {
     let income = 0;
     let expense = 0;
     const catTotals = {};
-    const dailySpendMap = {};
+    const dailyData = {};
 
     txs.forEach(t => {
       const amt = parseFloat(t.amount);
-      const dateStr = new Date(t.date).toLocaleDateString();
+      const dateStr = new Date(t.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+
+      if (!dailyData[dateStr]) {
+        dailyData[dateStr] = { date: dateStr, income: 0, expense: 0, timestamp: new Date(t.date).getTime() };
+      }
 
       if (amt > 0) {
         income += amt;
+        dailyData[dateStr].income += amt;
       } else {
         const absAmt = Math.abs(amt);
         expense += absAmt;
-        
-        // Category grouping
+        dailyData[dateStr].expense += absAmt;
         catTotals[t.category] = (catTotals[t.category] || 0) + absAmt;
-        
-        // Daily grouping
-        dailySpendMap[dateStr] = (dailySpendMap[dateStr] || 0) + absAmt;
       }
     });
 
@@ -65,18 +66,14 @@ export function Analysis() {
       }
     });
 
-    const uniqueDays = Object.keys(dailySpendMap).length;
-    const avgDaily = uniqueDays > 0 ? (expense / uniqueDays) : 0;
+    // Count just the days with expenses for average
+    let expenseDays = 0;
+    Object.values(dailyData).forEach(d => { if (d.expense > 0) expenseDays++; });
+    const avgDaily = expenseDays > 0 ? (expense / expenseDays) : 0;
 
-    // Build Chart Data sorted chronologically
-    const sortedChartData = Object.keys(dailySpendMap)
-      .map(date => ({
-        date,
-        amount: dailySpendMap[date],
-        timestamp: new Date(date).getTime()
-      }))
+    const sortedChartData = Object.values(dailyData)
       .sort((a, b) => a.timestamp - b.timestamp)
-      .map(item => ({ date: item.date, amount: item.amount }));
+      .map(item => ({ date: item.date, income: item.income, expense: item.expense }));
 
     setChartData(sortedChartData);
     setInsights({
@@ -132,27 +129,28 @@ export function Analysis() {
       </div>
 
       <Card>
-        <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>Daily Spending Trajectory</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: '500' }}>
+            <BarChart2 className="neon-text-cyan" /> Income vs. Expense Flow
+          </h3>
+        </div>
+        
         <div style={{ width: '100%', height: '350px' }}>
           {chartData.length > 0 ? (
             <ResponsiveContainer>
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--neon-cyan)" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="var(--neon-cyan)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} />
-                <YAxis stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} tickFormatter={(value) => `${currency}${value}`} />
+              <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} barGap={6}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                <YAxis stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} tickFormatter={(value) => `${currency}${value}`} axisLine={false} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}
-                  itemStyle={{ color: 'var(--text-primary)' }}
-                  formatter={(value) => [`${currency}${parseFloat(value).toFixed(2)}`, 'Spent']}
+                  contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+                  itemStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                 />
-                <Area type="monotone" dataKey="amount" stroke="var(--neon-cyan)" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" />
-              </AreaChart>
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="income" name="Income" fill="var(--neon-cyan)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="expense" name="Expense" fill="var(--neon-magenta)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <div style={{ display: 'flex', height: '100%', justifyContent: 'center', alignItems: 'center', color: 'var(--text-secondary)' }}>
