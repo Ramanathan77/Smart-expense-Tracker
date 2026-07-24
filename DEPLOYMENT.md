@@ -32,9 +32,11 @@ Since Render's free tier only supports PostgreSQL, we will host our MySQL databa
    - **Region:** Choose the region closest to you.
    - **Branch:** `main`
    - **Root Directory:** Keep empty (root directory).
-   - **Runtime:** `Docker` or `Java` (Java is automatically auto-detected by Render if using pom.xml, otherwise select **Java**).
-   - **Build Command:** `mvn clean package -DskipTests`
-   - **Start Command:** `java -jar target/demo-0.0.1-SNAPSHOT.jar`
+   - **Runtime:** Select **Docker** (Recommended, since we added a `Dockerfile` to the repository) or **Java**.
+     - **If using Docker:** You do not need to specify a build command or start command. Render will build using the `Dockerfile` automatically!
+     - **If using Java:**
+       - **Build Command:** `mvn clean package -DskipTests`
+       - **Start Command:** `java -jar target/demo-0.0.1-SNAPSHOT.jar`
    - **Instance Type:** Free
 5. Scroll down to the **Environment Variables** section and add the following keys:
    - `SPRING_DATASOURCE_URL`: `jdbc:mysql://<AIVEN_HOST>:<AIVEN_PORT>/<DATABASE_NAME>?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true` (replace with your Aiven details)
@@ -42,7 +44,7 @@ Since Render's free tier only supports PostgreSQL, we will host our MySQL databa
    - `SPRING_DATASOURCE_PASSWORD`: `<AIVEN_PASSWORD>`
    - `ALLOWED_ORIGINS`: `https://your-spendora-frontend.vercel.app` (You will get this URL in the next step when you deploy to Vercel. You can update this on Render after deploying to Vercel).
    - `GEMINI_API_KEY`: `<YOUR_GEMINI_API_KEY>` (needed for the AI Chat features to work online).
-6. Click **Deploy Web Service**. Render will compile and start the Java Spring Boot service on Port 8081. Once deployed, note down your backend's `.onrender.com` URL (e.g., `https://spendora-backend.onrender.com`).
+6. Click **Deploy Web Service**. Render will compile and start the Java Spring Boot service. Once deployed, note down your backend's `.onrender.com` URL (e.g., `https://spendora-backend.onrender.com`).
 
 ---
 
