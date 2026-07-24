@@ -87,7 +87,7 @@ export function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [budget]);
 
   const COLORS = ['#00f0ff', '#ff003c', '#8a2be2', '#00ff88', '#ffaa00'];
 

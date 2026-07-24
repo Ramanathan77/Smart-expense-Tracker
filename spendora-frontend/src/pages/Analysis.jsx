@@ -7,7 +7,6 @@ import { getTransactions } from '../services/api';
 
 export function Analysis() {
   const { currency } = useCurrency();
-  const [transactions, setTransactions] = useState([]);
   const [insights, setInsights] = useState({
     totalIncome: 0,
     totalExpense: 0,
@@ -22,7 +21,6 @@ export function Analysis() {
       try {
         const data = await getTransactions();
         if (Array.isArray(data)) {
-          setTransactions(data);
           analyzeData(data);
         }
       } catch (err) {
