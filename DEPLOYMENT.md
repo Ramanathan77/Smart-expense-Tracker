@@ -4,14 +4,22 @@ Follow this guide step-by-step to host the Spendora fullstack application online
 
 ---
 
-## Step 1: Deploy a Free MySQL Database (via Aiven)
+## Step 1: Choose Your Database Hosting Option (Free)
 
-Since Render's free tier only supports PostgreSQL, we will host our MySQL database on **Aiven** for free:
+Choose one of the two options below to configure your database:
 
+### Option A: In-Memory H2 Database (Easiest, Zero Setup)
+If you want to quickly test the live app online without creating a separate database account:
+- You can **skip Step 1** entirely!
+- The backend will automatically fall back to an in-memory H2 database.
+- *Note: Any data added will reset if the Render backend container spins down (which happens after inactivity on Render's free tier).*
+
+### Option B: Dedicated MySQL Database (via Aiven - Recommended for Persistence)
+If you want your transactions and users to persist permanently for free:
 1. Sign up for a free account at [Aiven.io](https://aiven.io).
 2. Create a new service:
    - **Service Type:** MySQL
-   - **Cloud Provider:** Select a free region (e.g., AWS or GCP free tier regions).
+   - **Cloud Provider:** Select any free region (e.g., AWS or GCP free tier regions).
    - **Plan:** Free tier (1 CPU, 1 GB RAM, 5 GB storage).
 3. Once the database is running, copy the database connection details from your Aiven Console:
    - **Host** (e.g., `mysql-xxxxx.aivencloud.com`)
@@ -39,11 +47,17 @@ Since Render's free tier only supports PostgreSQL, we will host our MySQL databa
        - **Start Command:** `java -jar target/demo-0.0.1-SNAPSHOT.jar`
    - **Instance Type:** Free
 5. Scroll down to the **Environment Variables** section and add the following keys:
-   - `SPRING_DATASOURCE_URL`: `jdbc:mysql://<AIVEN_HOST>:<AIVEN_PORT>/<DATABASE_NAME>?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true` (replace with your Aiven details)
-   - `SPRING_DATASOURCE_USERNAME`: `<AIVEN_USER>`
-   - `SPRING_DATASOURCE_PASSWORD`: `<AIVEN_PASSWORD>`
-   - `ALLOWED_ORIGINS`: `https://your-spendora-frontend.vercel.app` (You will get this URL in the next step when you deploy to Vercel. You can update this on Render after deploying to Vercel).
-   - `GEMINI_API_KEY`: `<YOUR_GEMINI_API_KEY>` (needed for the AI Chat features to work online).
+   - **Required for all options**:
+     - `GEMINI_API_KEY`: `<YOUR_GEMINI_API_KEY>` (needed for the AI Chat features to work online).
+     - `JWT_SECRET`: A long secure custom string (e.g. `your_own_super_long_custom_cryptographic_secret_key_here`) for securing authentication tokens.
+     - `ALLOWED_ORIGINS`: `https://your-spendora-frontend.vercel.app` (You will get this URL in the next step when you deploy to Vercel. You can update this on Render after deploying to Vercel).
+   - **Additional Keys required ONLY if using Option B (Aiven MySQL)**:
+     - `SPRING_DATASOURCE_URL`: `jdbc:mysql://<AIVEN_HOST>:<AIVEN_PORT>/<DATABASE_NAME>?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true`
+     - `SPRING_DATASOURCE_USERNAME`: `<AIVEN_USER>`
+     - `SPRING_DATASOURCE_PASSWORD`: `<AIVEN_PASSWORD>`
+     - `SPRING_DATASOURCE_DRIVER_CLASS_NAME`: `com.mysql.cj.jdbc.Driver`
+     - `SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT`: `org.hibernate.dialect.MySQLDialect`
+     - `SPRING_JPA_HIBERNATE_DDL_AUTO`: `update`
 6. Click **Deploy Web Service**. Render will compile and start the Java Spring Boot service. Once deployed, note down your backend's `.onrender.com` URL (e.g., `https://spendora-backend.onrender.com`).
 
 ---
