@@ -39,7 +39,7 @@ If you want your transactions and users to persist permanently for free:
    - **Name:** `spendora-backend`
    - **Region:** Choose the region closest to you.
    - **Branch:** `main`
-   - **Root Directory:** Keep empty (root directory).
+   - **Root Directory:** Edit this and set to `backend`.
    - **Runtime:** Select **Docker** (Recommended, since we added a `Dockerfile` to the repository) or **Java**.
      - **If using Docker:** You do not need to specify a build command or start command. Render will build using the `Dockerfile` automatically!
      - **If using Java:**
