@@ -198,7 +198,7 @@ export function Transactions() {
               onChange={e => setSearchQuery(e.target.value)}
               style={{ background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', outline: 'none' }} 
             />
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--glass-bg)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
               <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>From:</span>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} />
               <span style={{color: 'var(--text-secondary)', fontSize: '14px'}}>To:</span>
@@ -236,7 +236,7 @@ export function Transactions() {
 
       {showAdd && (
         <Card highlight style={{ marginBottom: '24px' }}>
-          <form onSubmit={handleAddOrEdit} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <form onSubmit={handleAddOrEdit} className="responsive-flex-form">
             <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ minWidth: '120px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
               <option value="expense" style={{background: 'var(--bg-primary)'}}>Expense</option>
               <option value="income" style={{background: 'var(--bg-primary)'}}>Income</option>
@@ -277,7 +277,7 @@ export function Transactions() {
       )}
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="desktop-transactions-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                <th style={{ padding: '16px 24px' }}>Transaction</th>
@@ -327,6 +327,52 @@ export function Transactions() {
             )}
           </tbody>
         </table>
+
+        {/* Mobile View */}
+        <div className="mobile-transactions-list">
+          {filteredTransactions.map(tx => {
+            const amt = parseFloat(tx.amount);
+            return (
+              <div key={tx.id || tx._id} className="mobile-tx-card">
+                <div className="mobile-tx-row-1">
+                  <div className="mobile-tx-info">
+                    <div className="mobile-tx-icon">
+                      {icons[tx.category] || icons['Other']}
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '16px', display: 'block' }}>{tx.name}</strong>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {new Date(tx.date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <strong style={{ fontSize: '16px', color: amt > 0 ? '#10b981' : 'var(--text-primary)' }}>
+                    {amt > 0 ? '+' : ''}{amt < 0 ? '-' : ''}{currency}{Math.abs(amt).toFixed(2)}
+                  </strong>
+                </div>
+                
+                <div className="mobile-tx-details">
+                  <span className="mobile-tx-badge">{tx.category}</span>
+                  <span className="mobile-tx-badge">{tx.walletType || 'Cash'}</span>
+                </div>
+                
+                <div className="mobile-tx-actions">
+                  <Button variant="outline" onClick={() => handleEditClick(tx)} style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--neon-cyan)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                    Edit
+                  </Button>
+                  <Button variant="outline" onClick={() => handleDelete(tx.id || tx._id)} style={{ padding: '6px 12px', borderColor: 'rgba(255,0,60,0.3)', color: 'var(--neon-magenta)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Trash2 size={14} /> Delete
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {transactions.length === 0 && (
+            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No transactions yet. Add one above.
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

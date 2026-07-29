@@ -40,7 +40,7 @@ export function Insights() {
   };
 
   return (
-    <div className="dashboard-container" style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+    <div className="insights-container">
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
         <Sparkles className="neon-text-cyan" size={32} />
         <h1 style={{ margin: 0 }}>Ask Spendora AI</h1>

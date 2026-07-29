@@ -39,14 +39,14 @@ export function Auth({ onLogin }) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', background: 'var(--bg-primary)', flexWrap: 'wrap', position: 'relative' }}>
+    <div className="auth-container">
       
       <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
         <ThemeToggle />
       </div>
 
       {/* Left Info Section */}
-      <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', padding: '64px', justifyContent: 'center', background: 'rgba(14, 165, 233, 0.05)', borderRight: '1px solid var(--glass-border)' }}>
+      <div className="auth-info-section">
         <div className="logo neon-text-cyan" style={{ fontSize: '42px', marginBottom: '24px' }}>
           <Sparkles size={42} /> Spendora
         </div>
@@ -91,8 +91,8 @@ export function Auth({ onLogin }) {
       </div>
       
       {/* Right Login Section */}
-      <div style={{ flex: '1 1 400px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
-        <Card highlight style={{ width: '100%', maxWidth: '450px', padding: '48px' }}>
+      <div className="auth-form-section">
+        <Card highlight className="auth-card">
           <h2 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '32px' }}>
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>

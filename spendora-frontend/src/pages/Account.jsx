@@ -96,7 +96,7 @@ export function Account() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Personal Information</h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                <div className="responsive-grid-2">
                   <div>
                     <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '14px' }}>Full Name</label>
                     <input 

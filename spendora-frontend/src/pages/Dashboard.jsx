@@ -93,7 +93,7 @@ export function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Overview</h1>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Track your daily spending and insights.</p>
@@ -179,7 +179,7 @@ export function Dashboard() {
           </Card>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
           
           <Card className="chart-card">
             <h3 style={{ marginBottom: '24px', fontWeight: '500' }}>30-Day Spending Trend</h3>

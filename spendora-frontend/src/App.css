@@ -104,6 +104,63 @@
   background: var(--text-secondary);
 }
 
+/* Insights Responsive View */
+.insights-container {
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .insights-container {
+    height: calc(100vh - 180px) !important;
+  }
+}
+
+/* Transaction Responsive Views */
+.desktop-transactions-table {
+  display: table;
+  width: 100%;
+}
+
+.mobile-transactions-list {
+  display: none;
+}
+
+/* Auth Responsive Classes */
+.auth-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+  background: var(--bg-primary);
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.auth-info-section {
+  flex: 1 1 500px;
+  display: flex;
+  flex-direction: column;
+  padding: 64px;
+  justify-content: center;
+  background: rgba(14, 165, 233, 0.05);
+  border-right: 1px solid var(--glass-border);
+}
+
+.auth-form-section {
+  flex: 1 1 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 450px;
+  padding: 48px;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .spendora-app {
@@ -158,5 +215,96 @@
   .topbar {
     padding: 0 16px;
     height: 60px;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .topbar h2 {
+    display: none; /* Hide welcome message on mobile to fit controls */
+  }
+
+  .desktop-transactions-table {
+    display: none !important;
+  }
+  
+  .mobile-transactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .mobile-tx-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .mobile-tx-card:hover {
+    border-color: var(--glass-border-highlight);
+  }
+
+  .mobile-tx-row-1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mobile-tx-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mobile-tx-icon {
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-tx-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 10px;
+  }
+
+  .mobile-tx-badge {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .mobile-tx-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 10px;
+  }
+
+  .auth-info-section {
+    display: none !important;
+  }
+
+  .auth-form-section {
+    padding: 16px;
+  }
+
+  .auth-card {
+    padding: 24px !important;
   }
 }
+
